@@ -268,10 +268,12 @@ nest::hh_cond_beta_gap::Parameters_::get( DictionaryDatum& d ) const
   def< double >( d, names::g_Kv1, g_Kv1 );
   def< double >( d, names::g_Kv3, g_Kv3 );
   def< double >( d, names::g_L, g_L );
+  def< double >( d, names::C_m, C_m );
   def< double >( d, names::E_Na, E_Na );
   def< double >( d, names::E_K, E_K );
   def< double >( d, names::E_L, E_L );
-  def< double >( d, names::C_m, C_m );
+  def< double >( d, names::E_ex, E_ex );
+  def< double >( d, names::E_in, E_in );
   def< double >( d, names::tau_ex_rise, tau_Erise );
   def< double >( d, names::tau_ex_decay, tau_Edecay );
   def< double >( d, names::tau_in_rise, tau_Irise );
@@ -293,6 +295,8 @@ nest::hh_cond_beta_gap::Parameters_::set( const DictionaryDatum& d )
   updateValue< double >( d, names::E_K, E_K );
   updateValue< double >( d, names::g_L, g_L );
   updateValue< double >( d, names::E_L, E_L );
+  updateValue< double >( d, names::E_ex, E_ex );
+  updateValue< double >( d, names::E_in, E_in );
 
   updateValue< double >( d, names::tau_ex_rise, tau_Erise );
   updateValue< double >( d, names::tau_ex_decay, tau_Edecay );

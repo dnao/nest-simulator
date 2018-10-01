@@ -260,9 +260,9 @@ private:
     double E_L;        //!< Leak reversal Potential (aka resting potential) in mV
     double E_ex;       //!< Excitatory reversal Potential in mV
     double E_in;       //!< Inhibitory reversal Potential in mV
-    double tau_Erise;  //!< Synaptic Rise Time Constant Excitatory Synapse in ms
+    double tau_Erise;  //!< Synaptic Rise Time Constant for Excitatory Synapse in ms
     double tau_Edecay; //!< Synaptic Decay Time Constant for Excitatory Synapse in ms
-    double tau_Irise;  //!< Synaptic Rise Time Constant Inhibitory Synapse in ms
+    double tau_Irise;  //!< Synaptic Rise Time Constant for Inhibitory Synapse in ms
     double tau_Idecay; //!< Synaptic Decay Time Constant for Inhibitory Synapse in ms
     double I_e;        //!< Constant Current in pA
     double g_ext_ex;       //!< Constant External Excitatory Conductance in uS
