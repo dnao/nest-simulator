@@ -257,9 +257,9 @@ private:
     double C_m;        //!< Membrane Capacitance in pF
     double E_Na;       //!< Sodium Reversal Potential in mV
     double E_K;        //!< Potassium Reversal Potential in mV
+    double E_L;        //!< Leak reversal Potential (aka resting potential) in mV
     double E_ex;       //!< Excitatory reversal Potential in mV
     double E_in;       //!< Inhibitory reversal Potential in mV
-    double E_L;        //!< Leak reversal Potential (aka resting potential) in mV
     double tau_Erise;  //!< Synaptic Rise Time Constant Excitatory Synapse in ms
     double tau_Edecay; //!< Synaptic Decay Time Constant for Excitatory Synapse in ms
     double tau_Irise;  //!< Synaptic Rise Time Constant Inhibitory Synapse in ms
