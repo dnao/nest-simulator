@@ -377,10 +377,10 @@ private:
   struct Variables_
   {
     /** initial value to normalise excitatory synaptic current */
-    double PSCurrInit_E_;
+    double PSConInit_E_;
 
     /** initial value to normalise inhibitory synaptic current */
-    double PSCurrInit_I_;
+    double PSConInit_I_;
 
     int RefractoryCounts_;
   };

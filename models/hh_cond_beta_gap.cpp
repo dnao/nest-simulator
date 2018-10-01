@@ -172,7 +172,7 @@ hh_cond_beta_gap_dynamics( double time,
   
   // d^2g_inh/dt^2, dg_inh/dt
   f[ S::DG_INH ] = -y[ S::DG_INH ] / node.P_.tau_Idecay;
-  f[ S::G_INH ] = y[ S::DG_INH ] - ( y[ S::G_INH / node.P_.tau_Irise );
+  f[ S::G_INH ] = y[ S::DG_INH ] - ( y[ S::G_INH ] / node.P_.tau_Irise );
 
   return GSL_SUCCESS;
 }
@@ -505,10 +505,10 @@ nest::hh_cond_beta_gap::calibrate()
   // ensures initialization in case mm connected after Simulate
   B_.logger_.init();
 
-  V_.PSConInit_E =
+  V_.PSConInit_E_ =
     nest::hh_cond_beta_gap::get_normalisation_factor( P_.tau_Erise,
       P_.tau_Edecay);
-  V_.PSConInit_I =
+  V_.PSConInit_I_ =
     nest::hh_cond_beta_gap::get_normalisation_factor( P_.tau_Irise,
       P_.tau_Idecay);
   V_.RefractoryCounts_ = Time( Time::ms( P_.t_ref_ ) ).get_steps();
