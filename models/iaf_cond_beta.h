@@ -70,8 +70,8 @@ tau_ex_decay double - Rise time of the excitatory synaptic beta function in ms.
 tau_in_rise  double - Rise time of the inhibitory synaptic beta function in ms.
 tau_in_decay double - Rise time of the inhibitory synaptic beta function in ms.
 I_e          double - Constant input current in pA.
-G_ex        double - Constant external input conductance in uS.
-G_in        double - Constant external input conductance in uS.
+G_ex         double - Constant external input conductance in uS.
+G_in         double - Constant external input conductance in uS.
 
 Sends: SpikeEvent
 
