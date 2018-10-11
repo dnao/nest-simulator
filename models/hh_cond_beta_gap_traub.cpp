@@ -112,18 +112,18 @@ hh_cond_beta_gap_traub_dynamics( double time,
   switch ( kernel().simulation_manager.get_wfr_interpolation_order() )
   {
   case 0:
-    gap = -node.B_.sumj_g_ij_ * V
+    gap = -node.B_.sumj_g_ij_ * y[ S::V_M ]
       + node.B_.interpolation_coefficients[ node.B_.lag_ ];
     break;
 
   case 1:
-    gap = -node.B_.sumj_g_ij_ * V
+    gap = -node.B_.sumj_g_ij_ * y[ S::V_M ]
       + node.B_.interpolation_coefficients[ node.B_.lag_ * 2 + 0 ]
       + node.B_.interpolation_coefficients[ node.B_.lag_ * 2 + 1 ] * t;
     break;
 
   case 3:
-    gap = -node.B_.sumj_g_ij_ * V
+    gap = -node.B_.sumj_g_ij_ * y[ S::V_M ]
       + node.B_.interpolation_coefficients[ node.B_.lag_ * 4 + 0 ]
       + node.B_.interpolation_coefficients[ node.B_.lag_ * 4 + 1 ] * t
       + node.B_.interpolation_coefficients[ node.B_.lag_ * 4 + 2 ] * t * t
@@ -332,7 +332,7 @@ nest::hh_cond_beta_gap_traub::State_::set( const DictionaryDatum& d )
   updateValue< double >( d, names::Act_m, y_[ HH_M ] );
   updateValue< double >( d, names::Act_h, y_[ HH_H ] );
   updateValue< double >( d, names::Inact_n, y_[ HH_N ] );
-  if ( y_[ HH_M ] < 0 || y_[ HH_H ] < 0 || y_[ HH_N ] < 0 || y_[ HH_P ] < 0 )
+  if ( y_[ HH_M ] < 0 || y_[ HH_H ] < 0 || y_[ HH_N ] < 0 )
   {
     throw BadProperty( "All (in)activation variables must be non-negative." );
   }
