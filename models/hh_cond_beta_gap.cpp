@@ -152,8 +152,8 @@ hh_cond_beta_gap_dynamics( double time,
   const double I_gap = gap;
 
   // V dot -- synaptic input are currents, inhib current is negative
-  f[ S::V_M ] = ( -( I_Na + I_K + I_L ) + node.B_.I_stim_ + node.P_.I_e + I_ex
-                  + I_in + I_gap ) / node.P_.C_m;
+  f[ S::V_M ] = ( -( I_Na + I_K + I_L ) + node.B_.I_stim_ + node.P_.I_e - I_ex
+                  - I_in + I_gap ) / node.P_.C_m;
 
   // channel dynamics
   f[ S::HH_M ] =
