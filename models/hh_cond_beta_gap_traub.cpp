@@ -187,8 +187,8 @@ nest::hh_cond_beta_gap_traub::Parameters_::Parameters_()
   , E_ex( 0.0 )        // mV
   , E_in( -80.0 )      // mV
   , tau_Erise( 0.5 )   // ms
-  , tau_Edecay( 0.5 )  // ms
-  , tau_Irise( 5.0 )   // ms
+  , tau_Edecay( 5.0 )  // ms
+  , tau_Irise( 0.5 )   // ms
   , tau_Idecay( 10.0 )  // ms
   , I_e( 0.0 )         // pA
   , g_ext_ex( 0.0 )    // uS
