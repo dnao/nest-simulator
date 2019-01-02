@@ -42,18 +42,34 @@
 #include "ring_buffer.h"
 #include "universal_data_logger.h"
 
-/* BeginDocumentation
+namespace nest
+{
+/**
+ * Function computing right-hand side of ODE for GSL solver.
+ * @note Must be declared here so we can befriend it in class.
+ * @note Must have C-linkage for passing to GSL. Internally, it is
+ *       a first-class C++ function, but cannot be a member function
+ *       because of the C-linkage.
+ * @note No point in declaring it inline, since it is called
+ *       through a function pointer.
+ * @param void* Pointer to model neuron instance.
+ */
+extern "C" int iaf_cond_beta_dynamics( double, const double*, double*, void* );
+
+/** @BeginDocumentation
 Name: iaf_cond_beta - Simple conductance based leaky integrate-and-fire neuron
-                       model.
+                      model.
 
 Description:
+
 iaf_cond_beta is an implementation of a spiking neuron using IAF dynamics with
 conductance-based synapses. Incoming spike events induce a post-synaptic change
 of conductance modelled by an beta function. The beta function
 is normalised such that an event of weight 1.0 results in a peak current of 1 nS
-at t = tau_syn.
+at t = tau_rise_[ex|in].
 
 Parameters:
+
 The following parameters can be set in the status dictionary.
 
 V_m          double - Membrane potential in mV
@@ -65,17 +81,24 @@ V_reset      double - Reset potential of the membrane in mV.
 E_ex         double - Excitatory reversal potential in mV.
 E_in         double - Inhibitory reversal potential in mV.
 g_L          double - Leak conductance in nS;
-tau_ex_rise  double - Rise time of the excitatory synaptic beta function in ms.
-tau_ex_decay double - Rise time of the excitatory synaptic beta function in ms.
-tau_in_rise  double - Rise time of the inhibitory synaptic beta function in ms.
-tau_in_decay double - Rise time of the inhibitory synaptic beta function in ms.
+tau_rise_ex  double - Rise time of the excitatory synaptic beta function in ms.
+tau_decay_ex double - Rise time of the excitatory synaptic beta function in ms.
+tau_rise_in  double - Rise time of the inhibitory synaptic beta function in ms.
+tau_decay_in double - Rise time of the inhibitory synaptic beta function in ms.
 I_e          double - Constant input current in pA.
-G_ex         double - Constant external input conductance in uS.
-G_in         double - Constant external input conductance in uS.
 
 Sends: SpikeEvent
 
 Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+
+Remarks:
+
+ @note Per 2009-04-17, this class has been revised to our newest
+        insights into class design. Please use THIS CLASS as a reference
+        when designing your own models with nonlinear dynamics.
+        One weakness of this class is that it distinguishes between
+        inputs to the two synapses by the sign of the synaptic weight.
+        It would be better to use receptor_types, cf iaf_cond_alpha_mc.
 
 References:
 
@@ -97,36 +120,11 @@ Roth and van Rossum,
 Ch 6, in De Schutter, Computational Modeling Methods for Neuroscientists,
 MIT Press, 2010.
 
+Author: Daniel Naoumenko (modified iaf_cond_alpha by Schrader, Plesser)
 
-Author: Schrader, Plesser
+SeeAlso: iaf_cond_exp, iaf_cond_alpha, iaf_cond_alpha_mc
 
-SeeAlso: iaf_cond_exp, iaf_cond_alpha
 */
-
-namespace nest
-{
-/**
- * Function computing right-hand side of ODE for GSL solver.
- * @note Must be declared here so we can befriend it in class.
- * @note Must have C-linkage for passing to GSL. Internally, it is
- *       a first-class C++ function, but cannot be a member function
- *       because of the C-linkage.
- * @note No point in declaring it inline, since it is called
- *       through a function pointer.
- * @param void* Pointer to model neuron instance.
- */
-extern "C" int iaf_cond_beta_dynamics( double, const double*, double*, void* );
-
-/**
- * Integrate-and-fire neuron model with two conductance-based synapses.
- *
- * @note Per 2009-04-17, this class has been revised to our newest
- *       insights into class design. Please use THIS CLASS as a reference
- *       when designing your own models with nonlinear dynamics.
- *       One weakness of this class is that it distinguishes between
- *       inputs to the two synapses by the sign of the synaptic weight.
- *       It would be better to use receptor_types, cf iaf_cond_beta_mc.
- */
 class iaf_cond_beta : public Archiving_Node
 {
 
@@ -162,7 +160,7 @@ public:
 private:
   void init_state_( const Node& proto );
   void init_buffers_();
-  double get_normalisation_factor(double, double);
+  double get_normalisation_factor( double, double );
   void calibrate();
   void update( Time const&, const long, const long );
 
@@ -183,21 +181,19 @@ private:
   //! Model parameters
   struct Parameters_
   {
-    double V_th;       //!< Threshold Potential in mV
-    double V_reset;    //!< Reset Potential in mV
-    double t_ref;      //!< Refractory period in ms
-    double g_L;        //!< Leak Conductance in nS
-    double C_m;        //!< Membrane Capacitance in pF
-    double E_ex;       //!< Excitatory reversal Potential in mV
-    double E_in;       //!< Inhibitory reversal Potential in mV
-    double E_L;        //!< Leak reversal Potential (aka resting potential) in mV
-    double tau_Erise;  //!< Synaptic Rise Time Constant Excitatory Synapse in ms
-    double tau_Edecay; //!< Synaptic Decay Time Constant for Excitatory Synapse in ms
-    double tau_Irise;  //!< Synaptic Rise Time Constant Inhibitory Synapse in ms
-    double tau_Idecay; //!< Synaptic Decay Time Constant for Inhibitory Synapse in ms
-    double I_e;        //!< Constant Current in pA
-    double g_ext_ex;       //!< Constant External Excitatory Conductance in uS
-    double g_ext_in;       //!< Constant External Inhibitory Conductance in uS
+    double V_th;         //!< Threshold Potential in mV
+    double V_reset;      //!< Reset Potential in mV
+    double t_ref;        //!< Refractory period in ms
+    double g_L;          //!< Leak Conductance in nS
+    double C_m;          //!< Membrane Capacitance in pF
+    double E_ex;         //!< Excitatory reversal Potential in mV
+    double E_in;         //!< Inhibitory reversal Potential in mV
+    double E_L;          //!< Leak reversal Potential (resting potential) in mV
+    double tau_rise_ex;  //!< Excitatory Synaptic Rise Time Constant in ms
+    double tau_decay_ex; //!< Excitatory Synaptic Decay Time Constant in ms
+    double tau_rise_in;  //!< Inhibitory Synaptic Rise Time Constant in ms
+    double tau_decay_in; //!< Inhibitory Synaptic Decay Time Constant  in ms
+    double I_e;          //!< Constant Current in pA
 
     Parameters_(); //!< Set default parameter values
 
@@ -262,8 +258,8 @@ private:
    */
   struct Buffers_
   {
-    Buffers_( iaf_cond_beta& );                  //!<Sets buffer pointers to 0
-    Buffers_( const Buffers_&, iaf_cond_beta& ); //!<Sets buffer pointers to 0
+    Buffers_( iaf_cond_beta& );                  //!< Sets buffer pointers to 0
+    Buffers_( const Buffers_&, iaf_cond_beta& ); //!< Sets buffer pointers to 0
 
     //! Logger for all analog data
     UniversalDataLogger< iaf_cond_beta > logger_;

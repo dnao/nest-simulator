@@ -25,7 +25,7 @@ list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 project( nest CXX C )
 set( NEST_USER_EMAIL "nest_user@nest-initiative.org" )
 
-# VERSION exported to libnestutil/config.h, extras/create_release.sh
+# VERSION exported to libnestutil/config.h, pynest/setup.py
 set( NEST_VERSION_MAJOR 2 )
 set( NEST_VERSION_MINOR 16 )
 set( NEST_VERSION_PATCHLEVEL 0 )
@@ -201,7 +201,7 @@ if ( HAVE_PYTHON )
       NEST_PATH="${CMAKE_INSTALL_FULL_BINDIR}"
       PYTHON="${PYTHON}"
       NEST_PYTHONPATH="${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}"
-      ${CMAKE_INSTALL_FULL_DATADIR}/extras/do_tests.sh --test-pynest --source-dir="${PROJECT_SOURCE_DIR}"
+      ${CMAKE_INSTALL_FULL_DATADIR}/extras/do_tests.sh --test-pynest
     WORKING_DIRECTORY "${PROJECT_BINARY_DIR}"
     COMMENT "Execute NEST's testsuite...."
   )
@@ -209,7 +209,7 @@ else ()
   add_custom_target( installcheck
     COMMAND ${CMAKE_COMMAND} -E env
       NEST_PATH="${CMAKE_INSTALL_FULL_BINDIR}"
-      ${CMAKE_INSTALL_FULL_DATADIR}/extras/do_tests.sh --source-dir="${PROJECT_SOURCE_DIR}"
+      ${CMAKE_INSTALL_FULL_DATADIR}/extras/do_tests.sh
     WORKING_DIRECTORY "${PROJECT_BINARY_DIR}"
     COMMENT "Execute NEST's testsuite...."
   )
@@ -344,11 +344,6 @@ configure_file(
 configure_file(
     "${PROJECT_SOURCE_DIR}/extras/nest-config.in"
     "${PROJECT_BINARY_DIR}/extras/nest-config" @ONLY
-)
-
-configure_file(
-    "${PROJECT_SOURCE_DIR}/extras/create_release.sh.in"
-    "${PROJECT_BINARY_DIR}/extras/create_release.sh" @ONLY
 )
 
 configure_file(
