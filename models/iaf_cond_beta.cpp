@@ -373,7 +373,7 @@ nest::iaf_cond_beta::get_normalisation_factor( double tau_rise,
   double tau_decay )
 {
   // Factor used to normalise the synaptic conductance such that
-  //
+  // incoming spike causes a conductance of amplitude 1 nS.
 
   return 1.0 / ( tau_decay * tau_rise );
 }
