@@ -582,9 +582,9 @@ nest::hh_cond_beta_gap_traub::update_( Time const& origin,
     if ( not called_from_wfr_update )
     {
       S_.y_[ State_::DG_EXC ] +=
-        B_.spike_exc_.get_value( lag ) * V_.PSConInit_E_;
+        B_.spike_exc_.get_value( lag ) * V_.PSConInit_E;
       S_.y_[ State_::DG_INH ] +=
-        B_.spike_inh_.get_value( lag ) * V_.PSConInit_I_;
+        B_.spike_inh_.get_value( lag ) * V_.PSConInit_I;
       // sending spikes: crossing 0 mV, pseudo-refractoriness and local
       // maximum...
       // refractory?
@@ -613,9 +613,9 @@ nest::hh_cond_beta_gap_traub::update_( Time const& origin,
     else // if(called_from_wfr_update)
     {
       S_.y_[ State_::DG_EXC ] +=
-        B_.spike_exc_.get_value_wfr_update( lag ) * V_.PSConInit_E_;
+        B_.spike_exc_.get_value_wfr_update( lag ) * V_.PSConInit_E;
       S_.y_[ State_::DG_INH ] +=
-        B_.spike_inh_.get_value_wfr_update( lag ) * V_.PSConInit_I_;
+        B_.spike_inh_.get_value_wfr_update( lag ) * V_.PSConInit_I;
       // check if deviation from last iteration exceeds wfr_tol
       wfr_tol_exceeded = wfr_tol_exceeded
         or fabs( S_.y_[ State_::V_M ] - B_.last_y_values[ lag ] ) > wfr_tol;
