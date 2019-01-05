@@ -77,7 +77,8 @@ RecordablesMap< hh_cond_beta_gap_traub >::create()
 }
 
 extern "C" int
-hh_cond_beta_gap_traub_dynamics( double, const double y[], double f[], void* pnode )
+hh_cond_beta_gap_traub_dynamics( double time, const double y[], double f[],
+  void* pnode )
 {
   // a shorthand
   typedef nest::hh_cond_beta_gap_traub::State_ S;
@@ -288,11 +289,6 @@ nest::hh_cond_beta_gap_traub::Parameters_::set( const DictionaryDatum& d )
   if ( C_m <= 0 )
   {
     throw BadProperty( "Capacitance must be strictly positive." );
-  }
-
-  if ( tau_synE <= 0 || tau_synI <= 0 )
-  {
-    throw BadProperty( "All time constants must be strictly positive." );
   }
 
   if ( t_ref_ < 0 )
@@ -508,7 +504,7 @@ nest::hh_cond_beta_gap_traub::calibrate()
  * Update and spike handling functions
  * ---------------------------------------------------------------- */
  
-void
+bool
 nest::hh_cond_beta_gap_traub::update_( Time const& origin,
   const long from,
   const long to,
