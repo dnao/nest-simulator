@@ -340,7 +340,7 @@ public:
    */
   struct Buffers_
   {
-    Buffers_( hh_cond_beta_gap_traub& ); //!<Sets buffer pointers to 0
+    Buffers_( hh_cond_beta_gap_traub& ); //!< Sets buffer pointers to 0
     //! Sets buffer pointers to 0
     Buffers_( const Buffers_&, hh_cond_beta_gap_traub& );
 
@@ -367,13 +367,13 @@ public:
 
     // remembers current lag for piecewise interpolation
     long lag_;
-	
+
     // remembers y_values from last wfr_update
     std::vector< double > last_y_values;
-	
+
     // summarized gap weight
     double sumj_g_ij_;
-	
+
     // summarized coefficients of the interpolation polynomial
     std::vector< double > interpolation_coefficients;
 
