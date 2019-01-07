@@ -151,8 +151,8 @@ Sends: SpikeEvent
 
 Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
 
-Author: Daniel Naoumenko (modified hh_cond_exp_traub by Schrader and hh_psc_alpha_gap
-by Jan Hahne, Moritz Helias and Susanne Kunkel)
+Author: Daniel Naoumenko (modified hh_cond_exp_traub by Schrader and
+hh_psc_alpha_gap by Jan Hahne, Moritz Helias and Susanne Kunkel)
 
 SeeAlso: hh_psc_alpha_gap, hh_cond_exp_traub, gap_junction, iaf_cond_beta
 */
@@ -161,7 +161,7 @@ class hh_cond_beta_gap_traub : public Archiving_Node
 
 public:
   typedef Node base;
-  
+
   hh_cond_beta_gap_traub();
   hh_cond_beta_gap_traub( const hh_cond_beta_gap_traub& );
   ~hh_cond_beta_gap_traub();
@@ -186,7 +186,7 @@ public:
   port handles_test_event( CurrentEvent&, rport );
   port handles_test_event( DataLoggingRequest&, rport );
   port handles_test_event( GapJunctionEvent&, rport );
-  
+
   void
   sends_secondary_event( GapJunctionEvent& )
   {
@@ -218,14 +218,14 @@ potentials_.connect_logging_device();
 private:
   void init_state_( const Node& proto );
   void init_buffers_();
-  double get_normalisation_factor(double, double);
+  double get_normalisation_factor( double, double );
   void calibrate();
 
   /** This is the actual update function. The additional boolean parameter
    * determines if the function is called by update (false) or wfr_update (true)
    */
   bool update_( Time const&, const long, const long, const bool );
-  
+
   void update( Time const&, const long, const long );
   bool wfr_update( Time const&, const long, const long );
 
@@ -253,14 +253,10 @@ private:
     double g_K;          //!< Potassium Conductance in nS
     double g_L;          //!< Leak Conductance in nS
     double C_m;          //!< Membrane Capacitance in pF
-
     double E_Na;         //!< Sodium Reversal Potential in mV
     double E_K;          //!< Potassium Reversal Potential in mV
     double E_L;          //!< Leak Reversal Potential in mV
-
-    //! Voltage offset for dynamics (adjusts threshold to around -50 mV)
-    double V_T;
-
+    double V_T;          //!< Voltage offset for dynamics in mV
     double E_ex;         //!< Excitatory reversal Potential in mV
     double E_in;         //!< Inhibitory reversal Potential in mV
     double tau_rise_ex;  //!< Excitatory Synaptic Rise Time Constant in ms
@@ -289,9 +285,9 @@ public:
     enum StateVecElems
     {
       V_M = 0,
-      HH_M,  // 1
-      HH_H,  // 2
-      HH_N,  // 3
+      HH_M,   // 1
+      HH_H,   // 2
+      HH_N,   // 3
       DG_EXC, // 4
       G_EXC,  // 5
       DG_INH, // 6
@@ -368,13 +364,16 @@ public:
     // it is safe to place both here.
     double step_;            //!< step size in ms
     double IntegrationStep_; //!< current integration time step, updated by GSL
-	
-	// remembers current lag for piecewise interpolation
+
+    // remembers current lag for piecewise interpolation
     long lag_;
+	
     // remembers y_values from last wfr_update
     std::vector< double > last_y_values;
+	
     // summarized gap weight
     double sumj_g_ij_;
+	
     // summarized coefficients of the interpolation polynomial
     std::vector< double > interpolation_coefficients;
 
@@ -408,7 +407,9 @@ public:
 };
 
 inline void
-hh_cond_beta_gap_traub::update( Time const& origin, const long from, const long to )
+hh_cond_beta_gap_traub::update( Time const& origin,
+  const long from,
+  const long to )
 {
   update_( origin, from, to, false );
 }
@@ -470,7 +471,8 @@ hh_cond_beta_gap_traub::handles_test_event( DataLoggingRequest& dlr,
 }
 
 inline port
-hh_cond_beta_gap_traub::handles_test_event( GapJunctionEvent&, rport receptor_type )
+hh_cond_beta_gap_traub::handles_test_event( GapJunctionEvent&,
+  rport receptor_type )
 {
   if ( receptor_type != 0 )
   {

@@ -26,6 +26,7 @@
 #ifdef HAVE_GSL
 
 // C++ includes:
+#include <cmath> // in case we need isnan() // fabs
 #include <cstdio>
 #include <iomanip>
 #include <iostream>
@@ -63,21 +64,29 @@ RecordablesMap< hh_cond_beta_gap_traub >::create()
 {
   // use standard names whereever you can for consistency!
   insert_( names::V_m,
-    &hh_cond_beta_gap_traub::get_y_elem_< hh_cond_beta_gap_traub::State_::V_M > );
+    &hh_cond_beta_gap_traub::
+	  get_y_elem_< hh_cond_beta_gap_traub::State_::V_M > );
   insert_( names::g_ex,
-    &hh_cond_beta_gap_traub::get_y_elem_< hh_cond_beta_gap_traub::State_::G_EXC > );
+    &hh_cond_beta_gap_traub::
+	  get_y_elem_< hh_cond_beta_gap_traub::State_::G_EXC > );
   insert_( names::g_in,
-    &hh_cond_beta_gap_traub::get_y_elem_< hh_cond_beta_gap_traub::State_::G_INH > );
+    &hh_cond_beta_gap_traub::
+	  get_y_elem_< hh_cond_beta_gap_traub::State_::G_INH > );
   insert_( names::Act_m,
-    &hh_cond_beta_gap_traub::get_y_elem_< hh_cond_beta_gap_traub::State_::HH_M > );
+    &hh_cond_beta_gap_traub::
+	  get_y_elem_< hh_cond_beta_gap_traub::State_::HH_M > );
   insert_( names::Act_h,
-    &hh_cond_beta_gap_traub::get_y_elem_< hh_cond_beta_gap_traub::State_::HH_H > );
+    &hh_cond_beta_gap_traub::
+	  get_y_elem_< hh_cond_beta_gap_traub::State_::HH_H > );
   insert_( names::Inact_n,
-    &hh_cond_beta_gap_traub::get_y_elem_< hh_cond_beta_gap_traub::State_::HH_N > );
+    &hh_cond_beta_gap_traub::
+	  get_y_elem_< hh_cond_beta_gap_traub::State_::HH_N > );
 }
 
 extern "C" int
-hh_cond_beta_gap_traub_dynamics( double time, const double y[], double f[],
+hh_cond_beta_gap_traub_dynamics( double time,
+  const double y[],
+  double f[],
   void* pnode )
 {
   // a shorthand
@@ -100,7 +109,7 @@ hh_cond_beta_gap_traub_dynamics( double time, const double y[], double f[],
   const double I_K = node.P_.g_K * y[ S::HH_N ] * y[ S::HH_N ] * y[ S::HH_N ]
     * y[ S::HH_N ] * ( y[ S::V_M ] - node.P_.E_K );
   const double I_L = node.P_.g_L * ( y[ S::V_M ] - node.P_.E_L );
-  
+
   // chemical synaptic currents
   const double I_syn_exc = y[ S::G_EXC ] * ( y[ S::V_M ] - node.P_.E_ex );
   const double I_syn_inh = y[ S::G_INH ] * ( y[ S::V_M ] - node.P_.E_in );
@@ -135,9 +144,9 @@ hh_cond_beta_gap_traub_dynamics( double time, const double y[], double f[],
   default:
     throw BadProperty( "Interpolation order must be 0, 1, or 3." );
   }
-  
+
   const double I_gap = gap;
-  
+
   // membrane potential
   f[ S::V_M ] = ( -I_Na - I_K - I_L - I_syn_exc - I_syn_inh + node.B_.I_stim_
                   + I_gap + node.P_.I_e ) / node.P_.C_m;
@@ -163,7 +172,7 @@ hh_cond_beta_gap_traub_dynamics( double time, const double y[], double f[],
   // d^2g_exc/dt^2, dg_exc/dt
   f[ S::DG_EXC ] = -y[ S::DG_EXC ] / node.P_.tau_decay_ex;
   f[ S::G_EXC ] = y[ S::DG_EXC ] - ( y[ S::G_EXC ] / node.P_.tau_rise_ex );
-  
+
   // d^2g_inh/dt^2, dg_inh/dt
   f[ S::DG_INH ] = -y[ S::DG_INH ] / node.P_.tau_decay_in;
   f[ S::G_INH ] = y[ S::DG_INH ] - ( y[ S::G_INH ] / node.P_.tau_rise_in );
@@ -229,8 +238,8 @@ nest::hh_cond_beta_gap_traub::State_::State_( const State_& s )
   }
 }
 
-nest::hh_cond_beta_gap_traub::State_& nest::hh_cond_beta_gap_traub::State_::operator=(
-  const State_& s )
+nest::hh_cond_beta_gap_traub::State_& nest::hh_cond_beta_gap_traub::State_::
+  operator=( const State_& s )
 {
   assert( this != &s ); // would be bad logical error in program
   for ( size_t i = 0; i < STATE_VEC_SIZE; ++i )
@@ -295,13 +304,13 @@ nest::hh_cond_beta_gap_traub::Parameters_::set( const DictionaryDatum& d )
   {
     throw BadProperty( "Refractory time cannot be negative." );
   }
-  
+
   if ( tau_rise_ex <= 0 || tau_decay_ex <= 0 || tau_rise_in <= 0
     || tau_decay_in <= 0 )
   {
     throw BadProperty( "All time constants must be strictly positive." );
   }
-  
+
   if ( g_K < 0 || g_Na < 0 || g_L < 0 )
   {
     throw BadProperty( "All conductances must be non-negative." );
@@ -366,7 +375,8 @@ nest::hh_cond_beta_gap_traub::hh_cond_beta_gap_traub()
   Node::set_node_uses_wfr( kernel().simulation_manager.use_wfr() );
 }
 
-nest::hh_cond_beta_gap_traub::hh_cond_beta_gap_traub( const hh_cond_beta_gap_traub& n )
+nest::hh_cond_beta_gap_traub::hh_cond_beta_gap_traub(
+  const hh_cond_beta_gap_traub& n )
   : Archiving_Node( n )
   , P_( n.P_ )
   , S_( n.S_ )
@@ -399,7 +409,8 @@ nest::hh_cond_beta_gap_traub::~hh_cond_beta_gap_traub()
 void
 nest::hh_cond_beta_gap_traub::init_state_( const Node& proto )
 {
-  const hh_cond_beta_gap_traub& pr = downcast< hh_cond_beta_gap_traub >( proto );
+  const hh_cond_beta_gap_traub& pr =
+    downcast< hh_cond_beta_gap_traub >( proto );
   S_ = pr.S_;
 }
 
@@ -409,7 +420,7 @@ nest::hh_cond_beta_gap_traub::init_buffers_()
   B_.spike_exc_.clear(); // includes resize
   B_.spike_inh_.clear(); // includes resize
   B_.currents_.clear();  // includes resize
-  
+
   // allocate strucure for gap events here
   // function is called from Scheduler::prepare_nodes() before the
   // first call to update
@@ -418,17 +429,17 @@ nest::hh_cond_beta_gap_traub::init_buffers_()
   // determine size of structure depending on interpolation scheme
   // and unsigned int Scheduler::min_delay() (number of simulation time steps
   // per min_delay step)
-  
+
   // resize interpolation_coefficients depending on interpolation order
   const size_t buffer_size = kernel().connection_manager.get_min_delay()
     * ( kernel().simulation_manager.get_wfr_interpolation_order() + 1 );
-	
+
   B_.interpolation_coefficients.resize( buffer_size, 0.0 );
 
   B_.last_y_values.resize( kernel().connection_manager.get_min_delay(), 0.0 );
 
   B_.sumj_g_ij_ = 0.0;
-  
+
   Archiving_Node::clear_history();
 
   B_.logger_.reset();
@@ -468,7 +479,7 @@ nest::hh_cond_beta_gap_traub::init_buffers_()
   B_.sys_.jacobian = 0;
   B_.sys_.dimension = State_::STATE_VEC_SIZE;
   B_.sys_.params = reinterpret_cast< void* >( this );
-  
+
   B_.I_stim_ = 0.0;
 }
 
@@ -487,15 +498,15 @@ nest::hh_cond_beta_gap_traub::calibrate()
 {
   // ensures initialization in case mm connected after Simulate
   B_.logger_.init();
-  
+
   V_.PSConInit_E = nest::hh_cond_beta_gap_traub::get_normalisation_factor(
     P_.tau_rise_ex, P_.tau_decay_ex );
   V_.PSConInit_I = nest::hh_cond_beta_gap_traub::get_normalisation_factor(
     P_.tau_rise_in, P_.tau_decay_in );
-	
+
   V_.refractory_counts_ = Time( Time::ms( P_.t_ref_ ) ).get_steps();
   V_.U_old_ = S_.y_[ State_::V_M ];
-  
+
   // since t_ref_ >= 0, this can only fail in error
   assert( V_.refractory_counts_ >= 0 );
 }
@@ -594,7 +605,8 @@ nest::hh_cond_beta_gap_traub::update_( Time const& origin,
       }
       else
         // (    threshold    &&     maximum       )
-        if ( S_.y_[ State_::V_M ] >= P_.V_T + 30. && U_old > S_.y_[ State_::V_M ] )
+        if ( S_.y_[ State_::V_M ] >= P_.V_T + 30.
+		  && U_old > S_.y_[ State_::V_M ] )
       {
         S_.r_ = V_.refractory_counts_;
 
