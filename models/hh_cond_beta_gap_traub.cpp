@@ -150,7 +150,7 @@ hh_cond_beta_gap_traub_dynamics( double time,
   // membrane potential
   f[ S::V_M ] = ( -I_Na - I_K - I_L - I_syn_exc - I_syn_inh + node.B_.I_stim_
                   + I_gap + node.P_.I_e )
-                  / node.P_.C_m;
+    / node.P_.C_m;
 
   // channel dynamics
   const double V = y[ S::V_M ] - node.P_.V_T;
