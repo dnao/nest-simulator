@@ -93,7 +93,7 @@ vm neuron2     1.0 h Connect
 {                                             % reference data
  dup Transpose First /test_times Set         % times of reference 
                                
-   get cva   % array of recorded data
+ vm [/events [/times /V_m]] get cva   % array of recorded data
   6 ToUnitTestPrecision                      % to precision of reference
   Transpose                                  % all recorded tuples
   {First test_times exch MemberQ } Select    % those with reference
