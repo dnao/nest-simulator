@@ -32,6 +32,7 @@
 #include "aeif_cond_alpha.h"
 #include "aeif_cond_alpha_multisynapse.h"
 #include "aeif_cond_beta_multisynapse.h"
+#include "aeif_cond_beta_multisynapse_extg.h"
 #include "aeif_cond_exp.h"
 #include "aeif_psc_alpha.h"
 #include "aeif_psc_delta.h"
