@@ -167,6 +167,7 @@ const Name g( "g" );
 const Name g_ahp( "g_ahp" );
 const Name g_AMPA( "g_AMPA" );
 const Name g_ex( "g_ex" );
+const Name g_ex( "g_ext" );
 const Name g_GABA_A( "g_GABA_A" );
 const Name g_GABA_B( "g_GABA_B" );
 const Name g_in( "g_in" );
