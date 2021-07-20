@@ -27,6 +27,7 @@ set( models_sources
     aeif_psc_exp.h aeif_psc_exp.cpp
     aeif_psc_delta.h aeif_psc_delta.cpp
     aeif_psc_delta_clopath.h aeif_psc_delta_clopath.cpp
+	aiaf_cond_beta.h aiaf_cond_beta.cpp
     amat2_psc_exp.h amat2_psc_exp.cpp
     bernoulli_synapse.h
     binary_neuron.h

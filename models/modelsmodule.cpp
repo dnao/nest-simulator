@@ -37,6 +37,7 @@
 #include "aeif_psc_delta.h"
 #include "aeif_psc_delta_clopath.h"
 #include "aeif_psc_exp.h"
+#include "aiaf_cond_beta.h"
 #include "amat2_psc_exp.h"
 #include "erfc_neuron.h"
 #include "gauss_rate.h"
