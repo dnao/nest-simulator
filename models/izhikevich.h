@@ -34,45 +34,56 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
+/* BeginUserDocs: neuron, integrate-and-fire
 
-Name: izhikevich - Izhikevich neuron model
+Short description
++++++++++++++++++
 
-Description:
+Izhikevich neuron model
+
+Description
++++++++++++
+
 Implementation of the simple spiking neuron model introduced by Izhikevich
-[1]. The dynamics are given by:
-  @f[
-  dv/dt = 0.04*v^2 + 5*v + 140 - u + I \\
-     du/dt = a*(b*v - u)] @f]
+[1]_. The dynamics are given by:
 
-    if  \f$ v >= V_{th} \f$:
-      v is set to c
-      u is incremented by d
+.. math::
 
-    v jumps on each spike arrival by the weight of the spike.
+   dV_m/dt &= 0.04 V_m^2 + 5 V_m + 140 - u + I
+   du/dt &= a (b V_m - u)
 
-As published in [1], the numerics differs from the standard forward Euler
+
+.. math::
+
+   &\text{if}\;\;\; V_m \geq V_{th}:\\
+   &\;\;\;\; V_m \text{ is set to } c\\
+   &\;\;\;\; u \text{ is incremented by } d\\
+   & \, \\
+   &v \text{ jumps on each spike arrival by the weight of the spike}
+
+As published in [1]_, the numerics differs from the standard forward Euler
 technique in two ways:
-1) the new value of u is calculated based on the new value of v, rather than
-the previous value
-2) the variable v is updated using a time step half the size of that used to
-update variable u.
+
+1) the new value of :math:`u` is calculated based on the new value of
+   :math:`V_m`, rather than the previous value
+2) the variable :math:`V_m` is updated using a time step half the size of that
+   used to update variable :math:`u`.
 
 This model offers both forms of integration, they can be selected using the
-boolean parameter consistent_integration. To reproduce some results published
-on the basis of this model, it is necessary to use the published form of the
-dynamics. In this case, consistent_integration must be set to false. For all
-other purposes, it is recommended to use the standard technique for forward
-Euler integration. In this case, consistent_integration must be set to true
-(default).
+boolean parameter ``consistent_integration``. To reproduce some results
+published on the basis of this model, it is necessary to use the published form
+of the dynamics. In this case, ``consistent_integration`` must be set to false.
+For all other purposes, it is recommended to use the standard technique for
+forward Euler integration. In this case, ``consistent_integration`` must be set
+to true (default).
 
+For a detailed analysis and discussion of the numerical issues in the original publication, see [2]_.
 
-Parameters:
+Parameters
+++++++++++
+
 The following parameters can be set in the status dictionary.
 
-\verbatim embed:rst
 ======================= =======  ==============================================
  V_m                    mV       Membrane potential
  U_m                    mV       Membrane potential recovery variable
@@ -85,28 +96,35 @@ The following parameters can be set in the status dictionary.
  d                      mV       After-spike reset value of U_m
  consistent_integration boolean  Use standard integration technique
 ======================= =======  ==============================================
-\endverbatim
 
-References:
+References
+++++++++++
 
-\verbatim embed:rst
-.. [1] Izhikevich EM (2003). Simple model of spiking neurons. IEEE Transactions
-on
-       Neural Networks, 14:1569-1572.
-       DOI: https://doi.org/10.1109/TNN.2003.820440
-\endverbatim
+.. [1] Izhikevich EM. (2003). Simple model of spiking neurons. IEEE Transactions
+       on Neural Networks, 14:1569-1572. DOI: https://doi.org/10.1109/TNN.2003.820440
 
-Sends: SpikeEvent
+.. [2] Pauli R, Weidel P, Kunkel S, Morrison A (2018). Reproducing polychronization: A guide to maximizing
+       the reproducibility of spiking network models. Frontiers in Neuroinformatics, 12.
+       DOI: https://www.frontiersin.org/article/10.3389/fninf.2018.00046
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+Sends
++++++
 
-FirstVersion: 2009
+SpikeEvent
 
-Author: Hanuschkin, Morrison, Kunkel
+Receives
+++++++++
 
-SeeAlso: iaf_psc_delta, mat2_psc_exp
-*/
-class izhikevich : public Archiving_Node
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+See also
+++++++++
+
+iaf_psc_delta, mat2_psc_exp
+
+EndUserDocs */
+
+class izhikevich : public ArchivingNode
 {
 
 public:
@@ -121,28 +139,27 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  void handle( DataLoggingRequest& );
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
+  void handle( DataLoggingRequest& ) override;
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
 
-  port handles_test_event( DataLoggingRequest&, rport );
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
+  port handles_test_event( DataLoggingRequest&, rport ) override;
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
   friend class RecordablesMap< izhikevich >;
   friend class UniversalDataLogger< izhikevich >;
 
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
-  void update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
 
   // ----------------------------------------------------------------
 
@@ -171,7 +188,7 @@ private:
     Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;             //!< Store current values in dictionary
-    void set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
   // ----------------------------------------------------------------
@@ -295,7 +312,7 @@ izhikevich::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d, P_ );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
 
@@ -311,7 +328,7 @@ izhikevich::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

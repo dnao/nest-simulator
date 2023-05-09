@@ -158,7 +158,7 @@ typedef int thread;
 /**
  * Value for invalid connection port number.
  */
-const thread invalid_thread_ = -1;
+const thread invalid_thread = -1;
 
 /**
  * Connection port number to distinguish incoming connections,
@@ -170,7 +170,7 @@ const thread invalid_thread_ = -1;
 typedef long rport;
 
 /**
- * Connection port number to distinguis outgoing connections.
+ * Connection port number to distinguish outgoing connections.
  * Connections between Nodes are assigned port numbers.
  * Valid port numbers start at zero (0).
  * The value -1 is used for invalid or unassigned ports.
@@ -180,7 +180,7 @@ typedef long port;
 /**
  * Value for invalid connection port number.
  */
-const rport invalid_port_ = -1;
+const rport invalid_port = -1;
 
 /**
  * Weight of a connection.
@@ -212,7 +212,7 @@ const long delay_max = LONG_MAX;
  * determine by a bitwise AND operation if sender and receiver are compatible.
  * The check takes place in connection::check_connection().
  *
- * A device, such as the spike-generator or spike_detector,
+ * A device, such as the spike-generator or spike_recorder,
  * that can in a meaningful way be connected to either neuron model
  * can use the wildcard ALL, that will match any connection partner.
  */

@@ -43,29 +43,32 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Devices
-@ingroup music
+/* BeginUserDocs: device, MUSIC, spike
 
-Name: music_event_out_proxy - Device to forward spikes to remote applications
-                              using MUSIC.
+Short description
++++++++++++++++++
 
-Description:
+Device to forward spikes to remote applications using MUSIC
 
-A music_event_out_proxy is used to send spikes to a remote application that
+Description
++++++++++++
+
+A ``music_event_out_proxy`` is used to send spikes to a remote application that
 also uses MUSIC.
 
-The music_event_out_proxy represents a complete MUSIC event output
+The ``music_event_out_proxy`` represents a complete MUSIC event output
 port. The channel on the port to which a source node forwards its
 events is determined during connection setup by using the parameter
-music_channel of the connection. The name of the port is set via
+``music_channel`` of the connection. The name of the port is set via
 SetStatus (see Parameters section below).
 
-Parameters:
+This model is only available if NEST was compiled with MUSIC.
+
+Parameters
+++++++++++
 
 The following properties are available in the status dictionary:
 
-\verbatim embed:rst
 =========== ======= ========================================================
  port_name  string  The name of the MUSIC output_port to forward events to
                     (default: event_out)
@@ -73,24 +76,16 @@ The following properties are available in the status dictionary:
  published  boolean A bool indicating if the port has been already published
                     with MUSIC
 =========== ======= ========================================================
-\endverbatim
 
 The parameter port_name can be set using SetStatus.
 
-Examples:
+See also
+++++++++
 
-    /iaf_psc_alpha Create /n Set
-    /music_event_out_proxy Create /meop Set
-    n meop << /music_channel 2 >> Connect
+music_event_in_proxy, music_cont_in_proxy, music_message_in_proxy
 
-Author: Moritz Helias, Jochen Martin Eppler
+EndUserDocs */
 
-FirstVersion: March 2009
-
-Availability: Only when compiled with MUSIC
-
-SeeAlso: music_event_in_proxy, music_cont_in_proxy, music_message_in_proxy
-*/
 class music_event_out_proxy : public DeviceNode
 {
 
@@ -131,9 +126,8 @@ public:
   void set_status( const DictionaryDatum& );
 
 private:
-  void init_state_( Node const& );
   void init_buffers_();
-  void calibrate();
+  void pre_run_hook();
 
   void
   update( Time const&, const long, const long )
@@ -148,11 +142,10 @@ private:
   {
     std::string port_name_; //!< the name of MUSIC port to connect to
 
-    Parameters_();                     //!< Sets default parameter values
-    Parameters_( const Parameters_& ); //!< Recalibrate all times
+    Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;          //!< Store current values in dictionary
-    void set( const DictionaryDatum&, State_& ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, State_& ); //!< Set values from dictionary
   };
 
   // ------------------------------------------------------------
@@ -209,6 +202,6 @@ music_event_out_proxy::handles_test_event( SpikeEvent&, rport receptor_type )
 
 } // namespace
 
-#endif /* #ifndef MUSIC_EVENT_OUT_PROXY_H */
+#endif /* HAVE_MUSIC */
 
 #endif

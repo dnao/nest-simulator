@@ -29,35 +29,43 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Synapses
-@ingroup cont_delay
+/* BeginUserDocs: synapse, rate
 
-Name: rate_connection_delayed - Synapse type for rate connections with delay.
+Short description
++++++++++++++++++
 
-Description:
+Synapse type for rate connections with delay
 
-rate_connection_delayed is a connector to create connections with delay
+Description
++++++++++++
+
+``rate_connection_delayed`` is a connector to create connections with delay
 between rate model neurons.
 
 To create instantaneous rate connections please use
-the synapse type rate_connection_instantaneous.
+the synapse type ``rate_connection_instantaneous``.
 
-Transmits: DelayedRateConnectionEvent
+See also [1]_.
 
-References:
+Transmits
++++++++++
 
-\verbatim embed:rst
+DelayedRateConnectionEvent
+
+References
+++++++++++
+
 .. [1] Hahne J, Dahmen D, Schuecker J, Frommer A, Bolten M, Helias M,
        Diesmann M (2017). Integration of continuous-time dynamics in a
        spiking neural network simulator. Frontiers in Neuroinformatics, 11:34.
        DOI: https://doi.org/10.3389/fninf.2017.00034
-\endverbatim
 
-Author: David Dahmen, Jan Hahne, Jannis Schuecker
+See also
+++++++++
 
-SeeAlso: rate_connection_instantaneous, rate_neuron_ipn, rate_neuron_opn
-*/
+rate_connection_instantaneous, rate_neuron_ipn, rate_neuron_opn
+
+EndUserDocs */
 
 /**
  * Class representing a delayed rate connection. A rate_connection_delayed
@@ -71,7 +79,8 @@ public:
   // this line determines which common properties to use
   typedef CommonSynapseProperties CommonPropertiesType;
   typedef Connection< targetidentifierT > ConnectionBase;
-  typedef DelayedRateConnectionEvent EventType;
+
+  static constexpr ConnectionModelProperties properties = ConnectionModelProperties::HAS_DELAY;
 
   /**
    * Default Constructor.
@@ -82,6 +91,8 @@ public:
     , weight_( 1.0 )
   {
   }
+
+  SecondaryEvent* get_secondary_event();
 
   // Explicitly declare all methods inherited from the dependent base
   // ConnectionBase.
@@ -96,7 +107,7 @@ public:
   void
   check_connection( Node& s, Node& t, rport receptor_type, const CommonPropertiesType& )
   {
-    EventType ge;
+    DelayedRateConnectionEvent ge;
 
     s.sends_secondary_event( ge );
     ge.set_sender( s );
@@ -134,6 +145,9 @@ private:
 };
 
 template < typename targetidentifierT >
+constexpr ConnectionModelProperties RateConnectionDelayed< targetidentifierT >::properties;
+
+template < typename targetidentifierT >
 void
 RateConnectionDelayed< targetidentifierT >::get_status( DictionaryDatum& d ) const
 {
@@ -148,6 +162,13 @@ RateConnectionDelayed< targetidentifierT >::set_status( const DictionaryDatum& d
 {
   ConnectionBase::set_status( d, cm );
   updateValue< double >( d, names::weight, weight_ );
+}
+
+template < typename targetidentifierT >
+SecondaryEvent*
+RateConnectionDelayed< targetidentifierT >::get_secondary_event()
+{
+  return new DelayedRateConnectionEvent();
 }
 
 } // namespace

@@ -32,8 +32,8 @@
         https://doi.org/10.1371/journal.pcbi.1005507 */
 
 #include "gif_pop_psc_exp.h"
-#include "universal_data_logger_impl.h"
 #include "compose.hpp"
+#include "universal_data_logger_impl.h"
 
 // Includes from libnestutil:
 #include "dict_util.h"
@@ -55,7 +55,7 @@ template <>
 void
 RecordablesMap< gif_pop_psc_exp >::create()
 {
-  // use standard names whereever you can for consistency!
+  // use standard names wherever you can for consistency!
   insert_( names::V_m, &gif_pop_psc_exp::get_V_m_ );
   insert_( names::n_events, &gif_pop_psc_exp::get_n_events_ );
   insert_( names::E_sfa, &gif_pop_psc_exp::get_E_sfa_ );
@@ -155,11 +155,11 @@ nest::gif_pop_psc_exp::Parameters_::set( const DictionaryDatum& d, Node* node )
 
   if ( tau_sfa_.size() != q_sfa_.size() )
   {
-    throw BadProperty( String::compose(
-      "'tau_sfa' and 'q_sfa' need to have the same dimension.\nSize of "
-      "tau_sfa: %1\nSize of q_sfa: %2",
-      tau_sfa_.size(),
-      q_sfa_.size() ) );
+    throw BadProperty(
+      String::compose( "'tau_sfa' and 'q_sfa' need to have the same dimension.\nSize of "
+                       "tau_sfa: %1\nSize of q_sfa: %2",
+        tau_sfa_.size(),
+        q_sfa_.size() ) );
   }
 
   if ( c_m_ <= 0 )
@@ -262,13 +262,6 @@ nest::gif_pop_psc_exp::gif_pop_psc_exp( const gif_pop_psc_exp& n )
  * ---------------------------------------------------------------- */
 
 void
-nest::gif_pop_psc_exp::init_state_( const Node& proto )
-{
-  const gif_pop_psc_exp& pr = downcast< gif_pop_psc_exp >( proto );
-  S_ = pr.S_;
-}
-
-void
 nest::gif_pop_psc_exp::init_buffers_()
 {
   B_.ex_spikes_.clear(); //!< includes resize
@@ -279,7 +272,7 @@ nest::gif_pop_psc_exp::init_buffers_()
 
 
 void
-nest::gif_pop_psc_exp::calibrate()
+nest::gif_pop_psc_exp::pre_run_hook()
 {
   if ( P_.tau_sfa_.size() == 0 )
   {
@@ -294,7 +287,7 @@ nest::gif_pop_psc_exp::calibrate()
   B_.logger_.init();
 
   V_.h_ = Time::get_resolution().get_ms();
-  V_.rng_ = kernel().rng_manager.get_rng( get_thread() );
+  V_.rng_ = get_vp_specific_rng( get_thread() );
   V_.min_double_ = std::numeric_limits< double >::min();
   V_.R_ = P_.tau_m_ / P_.c_m_; // membrane resistance
 
@@ -405,8 +398,8 @@ nest::gif_pop_psc_exp::draw_poisson( const double n_expect_ )
     // we draw a Bernoulli random number instead of Poisson.
     if ( 1. - ( n_expect_ + 1. ) * std::exp( -n_expect_ ) > V_.min_double_ )
     {
-      V_.poisson_dev_.set_lambda( n_expect_ );
-      n_t_ = V_.poisson_dev_.ldev( V_.rng_ );
+      poisson_distribution::param_type param( n_expect_ );
+      n_t_ = V_.poisson_dist_( V_.rng_, param );
     }
     else
     {
@@ -448,9 +441,10 @@ nest::gif_pop_psc_exp::draw_binomial( const double n_expect_ )
   }
   else
   {
-    V_.bino_dev_.set_p_n( p_bino_, P_.N_ );
+    binomial_distribution::param_type param( P_.N_, p_bino_ );
+    return V_.bino_dist_( V_.rng_, param );
   }
-  return V_.bino_dev_.ldev( V_.rng_ );
+  return V_.bino_dist_( V_.rng_ );
 }
 
 
@@ -479,7 +473,7 @@ nest::gif_pop_psc_exp::get_history_size()
 
   int k = tmax / V_.h_;
   int kmin = 5 * P_.tau_m_ / V_.h_;
-  while ( ( adaptation_kernel( k ) / P_.Delta_V_ < 0.1 ) and ( k > kmin ) )
+  while ( ( adaptation_kernel( k ) / P_.Delta_V_ < 0.1 ) and k > kmin )
   {
     k--;
   }
@@ -494,9 +488,6 @@ nest::gif_pop_psc_exp::get_history_size()
 void
 nest::gif_pop_psc_exp::update( Time const& origin, const long from, const long to )
 {
-  assert( to >= 0 and ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   for ( long lag = from; lag < to; ++lag )
   {
     // main update routine, see Fig. 11 of [1]

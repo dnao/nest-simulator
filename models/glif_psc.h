@@ -32,116 +32,166 @@
 
 #include "dictdatum.h"
 
-/* BeginDocumentation
-Name: glif_psc - Current-based generalized leaky integrate and fire (GLIF)
-model
+/* BeginUserDocs: integrate-and-fire, current-based
 
-Description:
+Short description
++++++++++++++++++
 
-glif_psc provides five generalized leaky integrate-and-fire
-(GLIF) models [1] with alpha-function shaped synaptic currents.
-Incoming spike events induce a post-synaptic change of current modeled
-by an alpha function. The alpha function is normalized such that an event of
-weight 1.0 results in a peak current of 1 pA at t = tau_syn. By default,
+Current-based generalized leaky integrate-and-fire (GLIF) models (from the Allen Institute)
+
+Description
++++++++++++
+
+``glif_psc`` provides five generalized leaky integrate-and-fire
+(GLIF) models [1]_ with alpha-function shaped synaptic currents.
+Incoming spike events induce a postsynaptic change of current modeled
+by an alpha function [2]_. The alpha function is normalized such that an event
+of weight 1.0 results in a peak current of 1 pA at :math:`t = tau_syn`. By default,
 glif_psc has a single synapse that is accessible through receptor_port 1.
 An arbitrary number of synapses with different time constants can be
 configured by setting the desired time constants as tau_syn array.
 The resulting synapses are addressed through receptor_port 1, 2, 3, ....
 
-The five GLIF models are
+The five GLIF models are:
 
-GLIF Model 1 - Traditional leaky integrate and fire (LIF) model,
-GLIF Model 2 - Leaky integrate and fire with biologically defined reset rules
-               (LIF_R) model,
-GLIF Model 3 - Leaky integrate and fire with after-spike currents (LIF_ASC) model,
-GLIF Model 4 - Leaky integrate and fire with biologically defined reset rules
-               and after-spike currents (LIF_R_ASC) model,
-GLIF Model 5 - Leaky integrate and fire with biologically defined reset rules,
-               after-spike currents and a voltage dependent threshold
-               (LIF_R_ASC_A) model.
-
-Parameters:
-
-The following parameters can be set in the status dictionary.
-
-V_m        double - Membrane potential in mV (absolute value).
-V_th       double - Instantaneous threshold in mV.
-g          double - Membrane conductance in nS.
-E_L        double - Resting membrane potential in mV.
-C_m        double - Capacitance of the membrane in pF.
-t_ref      double - Duration of refractory time in ms.
-V_reset    double - Reset potential of the membrane in mV (GLIF 1 or GLIF 3).
-th_spike_add           double - Threshold addition following spike in mV
-                                (delta_theta_s in Equation (6) in [1]).
-th_spike_decay         double - Spike-induced threshold time constant in 1/ms
-                                (bs in Equation (2) in [1]).
-voltage_reset_fraction double - Voltage fraction coefficient following spike
-                                (fv in Equation (5) in [1]).
-voltage_reset_add      double - Voltage addition following spike in mV.
-                                (-delta_V (sign flipped) in Equation (5) in [1])
-asc_init         double vector - Initial values of after-spike currents in pA.
-asc_decay        double vector - After-spike current time constants in 1/ms
-                                 (kj in Equation (3) in [1]).
-asc_amps         double vector - After-spike current amplitudes in pA
-                                 (deltaIj in Equation (7) in [1]).
-asc_r            double vector - Current fraction following spike coefficients
-                                 for fj in Equation (7) in [1].
-th_voltage_index double - Adaptation index of threshold - A 'leak-conductance'
-                          for the voltage-dependent component of the threshold
-                          in 1/ms (av in Equation (4) in [1]).
-th_voltage_decay double - Voltage-induced threshold time constant - Inverse of which
-                          is the time constant of the voltage-dependent component
-                          of the threshold in 1/ms (bv in Equation (4) in [1]).
-tau_syn          double vector - Rise time constants of the synaptic alpha function
-                                 in ms.
-spike_dependent_threshold bool - flag whether the neuron has biologically defined
-                                 reset rules with a spike dependent threshold component.
-after_spike_currents      bool - flag whether the neuron has after spike currents.
-adapting_threshold        bool - flag whether the neuron has a voltage dependent
-                                 threshold component.
-
-Remarks:
+* **GLIF Model 1** - Traditional leaky integrate and fire (LIF)
+* **GLIF Model 2** - Leaky integrate and fire with biologically defined reset rules
+  (LIF_R)
+* **GLIF Model 3** - Leaky integrate and fire with after-spike currents (LIF_ASC)
+* **GLIF Model 4** - Leaky integrate and fire with biologically defined reset rules
+  and after-spike currents (LIF_R_ASC)
+* **GLIF Model 5** - Leaky integrate and fire with biologically defined reset rules,
+  after-spike currents and a voltage dependent threshold (LIF_R_ASC_A)
 
 GLIF model mechanism setting is based on three parameters
-(spike_dependent_threshold, after_spike_currents, adapting_threshold).
-The settings of these three parameters for the five GLIF models are list below.
-Other combinations of these parameters will not be supported.
-GLIF Model 1 (LIF) - (False, False, False),
-GLIF Model 2 (LIF_R) - (True, False, False),
-GLIF Model 3 (LIF_ASC) - (False, True, False),
-GLIF Model 4 (LIF_R_ASC) - (True, True, False),
-GLIF Model 5 (LIF_R_ASC-A) - (True, True, True).
+(``spike_dependent_threshold``, ``after_spike_currents``, ``adapting_threshold``).
+The settings of these three parameters for the five GLIF models are listed
+below. Other combinations of these parameters will not be supported.
+
+============= ======= ======= ======
+**Parameter settings**
+------------------------------------
+GLIF Model 1   False   False   False
+GLIF Model 2   True    False   False
+GLIF Model 3   False   True    False
+GLIF Model 4   True    True    False
+GLIF Model 5   True    True    True
+============= ======= ======= ======
 
 Typical parameter setting of different levels of GLIF models for different cells
-can be found and downloaded in the Allen Cell Type Database (celltypes.brain-map.org).
-For example, the default parameter setting of glif_psc neuron model was from
-the parameter values of GLIF Model 5 of Cell 490626718, which can be retrieved from
-<https://celltypes.brain-map.org/mouse/experiment/electrophysiology/490626718>,
-with units being converted from SI units (i.e., V, S (1/Ohm), F, s, A) to
-NEST used units (i.e., mV, nS (1/GOhm), pF, ms, pA) and values being rounded to
-appropriate digits for simplification.
+can be found and downloaded in the `Allen Cell Type Database
+<https://celltypes.brain-map.org>`_. For example, the default parameter setting of this
+glif_cond neuron model was from the parameter values of GLIF Model 5 of Cell
+490626718, which can be retrieved from the `Allen Brain Atlas
+<https://celltypes.brain-map.org/mouse/experiment/electrophysiology/
+490626718>`_, with units being converted from SI units (i.e., V, S (1/Ohm),
+F, s, A) to NEST used units (i.e., mV, nS (1/GOhm), pF, ms, pA) and values
+being rounded to appropriate digits for simplification.
 
 For models with spike dependent threshold (i.e., GLIF2, GLIF4 and GLIF5),
 parameter setting of voltage_reset_fraction and voltage_reset_add may lead to the
 situation that voltage is bigger than threshold after reset. In this case, the neuron
-will continue spike until the end of the simulation regardless the stimulated inputs.
+will continue to spike until the end of the simulation regardless the stimulated inputs.
 We recommend the setting of the parameters of these three models to follow the
-condition of (E_L + voltage_reset_fraction * ( V_th - E_L ) + voltage_reset_add)
-< (V_th + th_spike_add).
+condition of :math:`(E_L + voltage_reset_fraction * ( V_th - E_L ) + voltage_reset_add)
+< (V_th + th_spike_add)`.
 
-References:
-[1] Teeter C, Iyer R, Menon V, Gouwens N, Feng D, Berg J, Szafer A,
-    Cain N, Zeng H, Hawrylycz M, Koch C, & Mihalas S (2018)
-    Generalized leaky integrate-and-fire models classify multiple neuron types.
-    Nature Communications 9:709.
+.. note::
 
-Author: Binghuang Cai and Kael Dai @ Allen Institute for Brain Science
-*/
+  If ``tau_m`` is very close to ``tau_syn_ex`` or ``tau_syn_in``, the model
+  will numerically behave as if ``tau_m`` is equal to ``tau_syn_ex`` or
+  ``tau_syn_in``, respectively, to avoid numerical instabilities.
+
+  For implementation details see the
+  `IAF_neurons_singularity <../model_details/IAF_neurons_singularity.ipynb>`_ notebook.
+
+Parameters
+++++++++++
+
+The following parameters can be set in the status dictionary.
+
+========= ======== ============================================================
+**Membrane parameters**
+-------------------------------------------------------------------------------
+V_m        double   Membrane potential in mV (absolute value)
+V_th       double   Instantaneous threshold in mV
+g          double   Membrane conductance in nS
+E_L        double   Resting membrane potential in mV
+C_m        double   Capacitance of the membrane in pF
+t_ref      double   Duration of refractory time in ms
+V_reset    double   Reset potential of the membrane in mV (GLIF 1 or GLIF 3)
+========= ======== ============================================================
+
+========================= =============== =====================================
+**Spike adaptation and firing intensity parameters**
+-------------------------------------------------------------------------------
+th_spike_add               double         Threshold addition following spike
+                                          in mV (delta_theta_s in Equation (6)
+                                          in [1]_)
+th_spike_decay             double         Spike-induced threshold time
+                                          constant in 1/ms (bs in Equation (2)
+                                          in [1]_)
+voltage_reset_fraction     double         Voltage fraction coefficient
+                                          following spike (fv in Equation (5)
+                                          in [1]_)
+voltage_reset_add          double         Voltage addition following spike in
+                                          mV (-delta_V (sign flipped) in
+                                          Equation (5) in [1]_)
+asc_init                   double vector  Initial values of after-spike
+                                          currents in pA
+asc_decay                  double vector  After-spike current time constants
+                                          in 1/ms (kj in Equation (3) in [1]_)
+asc_amps                   double vector  After-spike current amplitudes in
+                                          pA (deltaIj in Equation (7) in [1]_)
+asc_r                      double vector  Current fraction following spike
+                                          coefficients for fj in Equation (7)
+                                          in [1]_
+th_voltage_index           double         Adaptation index of threshold - A
+                                          'leak-conductance' for the
+                                          voltage-dependent component of the
+                                          threshold in 1/ms (av in Equation
+                                          (4) in [1]_)
+th_voltage_decay           double         Voltage-induced threshold time
+                                          constant - Inverse of which is the
+                                          time constant of the
+                                          voltage-dependent component of the
+                                          threshold in 1/ms (bv in Equation
+                                          (4) in [1]_)
+tau_syn                    double vector  Rise time constants of the synaptic
+                                          alpha function in ms
+E_rev                      double vector  Reversal potential in mV
+spike_dependent_threshold  bool           flag whether the neuron has
+                                          biologically defined reset rules
+                                          with a spike dependent threshold
+                                          component
+after_spike_currents       bool           flag whether the neuron has after
+                                          spike currents
+adapting_threshold         bool           flag whether the neuron has a
+                                          voltage dependent threshold component
+========================= =============== =====================================
+
+References
+++++++++++
+
+.. [1] Teeter C, Iyer R, Menon V, Gouwens N, Feng D, Berg J, Szafer A,
+       Cain N, Zeng H, Hawrylycz M, Koch C, & Mihalas S (2018)
+       Generalized leaky integrate-and-fire models classify multiple neuron
+       types. Nature Communications 9:709.
+.. [2] Meffin, H., Burkitt, A. N., & Grayden, D. B. (2004). An analytical
+       model for the large, fluctuating synaptic conductance state typical of
+       neocortical neurons in vivo. J.  Comput. Neurosci., 16, 159-175.
+
+See also
+++++++++
+
+gif_psc_exp_multisynapse, gif_cond_exp, gif_cond_exp_multisynapse, gif_pop_psc_exp
+
+EndUserDocs */
 
 namespace nest
 {
 
-class glif_psc : public nest::Archiving_Node
+class glif_psc : public nest::ArchivingNode
 {
 public:
   glif_psc();
@@ -151,31 +201,28 @@ public:
   using nest::Node::handle;
   using nest::Node::handles_test_event;
 
-  nest::port send_test_event( nest::Node&, nest::port, nest::synindex, bool );
+  nest::port send_test_event( nest::Node&, nest::port, nest::synindex, bool ) override;
 
-  void handle( nest::SpikeEvent& );
-  void handle( nest::CurrentEvent& );
-  void handle( nest::DataLoggingRequest& );
+  void handle( nest::SpikeEvent& ) override;
+  void handle( nest::CurrentEvent& ) override;
+  void handle( nest::DataLoggingRequest& ) override;
 
-  nest::port handles_test_event( nest::SpikeEvent&, nest::port );
-  nest::port handles_test_event( nest::CurrentEvent&, nest::port );
-  nest::port handles_test_event( nest::DataLoggingRequest&, nest::port );
+  nest::port handles_test_event( nest::SpikeEvent&, nest::port ) override;
+  nest::port handles_test_event( nest::CurrentEvent&, nest::port ) override;
+  nest::port handles_test_event( nest::DataLoggingRequest&, nest::port ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  //! Reset state of neuron.
-  void init_state_( const Node& proto );
-
   //! Reset internal buffers of neuron.
-  void init_buffers_();
+  void init_buffers_() override;
 
   //! Initialize auxiliary quantities, leave parameters and state untouched.
-  void calibrate();
+  void pre_run_hook() override;
 
   //! Take neuron through given time interval
-  void update( nest::Time const&, const long, const long );
+  void update( nest::Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access the State_ class/member
   friend class nest::RecordablesMap< glif_psc >;
@@ -220,7 +267,7 @@ private:
     Parameters_();
 
     void get( DictionaryDatum& ) const;
-    double set( const DictionaryDatum& );
+    double set( const DictionaryDatum&, Node* );
   };
 
   struct State_
@@ -230,7 +277,7 @@ private:
     double threshold_spike_;           //!< spike component of threshold in mV
     double threshold_voltage_;         //!< voltage component of threshold in mV
     double I_;                         //!< external current in pA
-    double I_syn_;                     //!< post synaptic current in pA
+    double I_syn_;                     //!< postsynaptic current in pA
     std::vector< double > ASCurrents_; //!< after-spike currents in pA
     double ASCurrents_sum_;            //!< in pA
     int refractory_steps_;             //!< Number of refractory steps remaining
@@ -240,7 +287,7 @@ private:
     State_( const Parameters_& );
 
     void get( DictionaryDatum&, const Parameters_& ) const;
-    void set( const DictionaryDatum&, const Parameters_&, double );
+    void set( const DictionaryDatum&, const Parameters_&, double, Node* );
   };
 
 
@@ -278,7 +325,7 @@ private:
     std::vector< double > P32_; //!< synaptic/membrane current evolution parameter
 
     /** Amplitude of the synaptic current.
-              This value is chosen such that a post-synaptic current with
+              This value is chosen such that a postsynaptic current with
               weight one has an amplitude of 1 pA.
     */
     std::vector< double > PSCInitialValues_;
@@ -378,7 +425,7 @@ glif_psc::get_status( DictionaryDatum& d ) const
   S_.get( d, P_ );
 
   // get information managed by parent class
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ nest::names::recordables ] = recordablesMap_.get_list();
 }
@@ -386,12 +433,12 @@ glif_psc::get_status( DictionaryDatum& d ) const
 inline void
 glif_psc::set_status( const DictionaryDatum& d )
 {
-  Parameters_ ptmp = P_;                 // temporary copy in case of errors
-  const double delta_EL = ptmp.set( d ); // throws if BadProperty
-  State_ stmp = S_;                      // temporary copy in case of errors
-  stmp.set( d, ptmp, delta_EL );         // throws if BadProperty
+  Parameters_ ptmp = P_;                       // temporary copy in case of errors
+  const double delta_EL = ptmp.set( d, this ); // throws if BadProperty
+  State_ stmp = S_;                            // temporary copy in case of errors
+  stmp.set( d, ptmp, delta_EL, this );         // throws if BadProperty
 
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

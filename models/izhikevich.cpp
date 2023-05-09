@@ -36,10 +36,7 @@
 #include "universal_data_logger_impl.h"
 
 // Includes from sli:
-#include "dict.h"
 #include "dictutils.h"
-#include "doubledatum.h"
-#include "integerdatum.h"
 
 /* ----------------------------------------------------------------
  * Recordables map
@@ -55,7 +52,7 @@ template <>
 void
 RecordablesMap< izhikevich >::create()
 {
-  // use standard names whereever you can for consistency!
+  // use standard names wherever you can for consistency!
   insert_( names::V_m, &izhikevich::get_V_m_ );
   insert_( names::U_m, &izhikevich::get_U_m_ );
 }
@@ -78,9 +75,9 @@ nest::izhikevich::Parameters_::Parameters_()
 }
 
 nest::izhikevich::State_::State_()
-  : v_( -65.0 ) // membrane potential
-  , u_( 0.0 )   // membrane recovery variable
-  , I_( 0.0 )   // input current
+  : v_( -65.0 )       // membrane potential
+  , u_( 0.2 * -65.0 ) // membrane recovery variable (b * V_m_init)
+  , I_( 0.0 )         // input current
 {
 }
 
@@ -104,7 +101,6 @@ nest::izhikevich::Parameters_::get( DictionaryDatum& d ) const
 void
 nest::izhikevich::Parameters_::set( const DictionaryDatum& d, Node* node )
 {
-
   updateValueParam< double >( d, names::V_th, V_th_, node );
   updateValueParam< double >( d, names::V_min, V_min_, node );
   updateValueParam< double >( d, names::I_e, I_e_, node );
@@ -114,7 +110,7 @@ nest::izhikevich::Parameters_::set( const DictionaryDatum& d, Node* node )
   updateValueParam< double >( d, names::d, d_, node );
   updateValue< bool >( d, names::consistent_integration, consistent_integration_ );
   const double h = Time::get_resolution().get_ms();
-  if ( not consistent_integration_ && h != 1.0 )
+  if ( not consistent_integration_ and h != 1.0 )
   {
     LOG( M_INFO, "Parameters_::set", "Use 1.0 ms as resolution for consistency." );
   }
@@ -149,7 +145,7 @@ nest::izhikevich::Buffers_::Buffers_( const Buffers_&, izhikevich& n )
  * ---------------------------------------------------------------- */
 
 nest::izhikevich::izhikevich()
-  : Archiving_Node()
+  : ArchivingNode()
   , P_()
   , S_()
   , B_( *this )
@@ -158,7 +154,7 @@ nest::izhikevich::izhikevich()
 }
 
 nest::izhikevich::izhikevich( const izhikevich& n )
-  : Archiving_Node( n )
+  : ArchivingNode( n )
   , P_( n.P_ )
   , S_( n.S_ )
   , B_( n.B_, *this )
@@ -170,23 +166,16 @@ nest::izhikevich::izhikevich( const izhikevich& n )
  * ---------------------------------------------------------------- */
 
 void
-nest::izhikevich::init_state_( const Node& proto )
-{
-  const izhikevich& pr = downcast< izhikevich >( proto );
-  S_ = pr.S_;
-}
-
-void
 nest::izhikevich::init_buffers_()
 {
   B_.spikes_.clear();   // includes resize
   B_.currents_.clear(); // includes resize
   B_.logger_.reset();   // includes resize
-  Archiving_Node::clear_history();
+  ArchivingNode::clear_history();
 }
 
 void
-nest::izhikevich::calibrate()
+nest::izhikevich::pre_run_hook()
 {
   B_.logger_.init();
 }
@@ -198,9 +187,6 @@ nest::izhikevich::calibrate()
 void
 nest::izhikevich::update( Time const& origin, const long from, const long to )
 {
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   const double h = Time::get_resolution().get_ms();
   double v_old, u_old;
 

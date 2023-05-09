@@ -28,6 +28,7 @@
 #include <cmath>
 
 // Includes from libnestutil:
+#include "beta_normalization_factor.h"
 #include "dict_util.h"
 
 // Includes from nestkernel:
@@ -107,7 +108,7 @@ ht_neuron_dynamics( double, const double y[], double f[], void* pnode )
   const double INaP_thresh = -55.7;
   const double INaP_slope = 7.7;
   const double m_inf_NaP = 1.0 / ( 1.0 + std::exp( -( V - INaP_thresh ) / INaP_slope ) );
-  node.S_.I_NaP_ = -node.P_.g_peak_NaP * std::pow( m_inf_NaP, 3.0 ) * ( V - node.P_.E_rev_NaP );
+  node.S_.I_NaP_ = -node.P_.g_peak_NaP * std::pow( m_inf_NaP, node.P_.N_NaP ) * ( V - node.P_.E_rev_NaP );
 
   // I_DK
   const double d_half = 0.25;
@@ -115,7 +116,7 @@ ht_neuron_dynamics( double, const double y[], double f[], void* pnode )
   node.S_.I_KNa_ = -node.P_.g_peak_KNa * m_inf_KNa * ( V - node.P_.E_rev_KNa );
 
   // I_T
-  node.S_.I_T_ = -node.P_.g_peak_T * y[ S::m_IT ] * y[ S::m_IT ] * y[ S::h_IT ] * ( V - node.P_.E_rev_T );
+  node.S_.I_T_ = -node.P_.g_peak_T * std::pow( y[ S::m_IT ], node.P_.N_T ) * y[ S::h_IT ] * ( V - node.P_.E_rev_T );
 
   // I_h
   node.S_.I_h_ = -node.P_.g_peak_h * y[ S::m_Ih ] * ( V - node.P_.E_rev_h );
@@ -213,10 +214,11 @@ nest::ht_neuron::m_NMDA_( double V, double m_eq, double m_fast, double m_slow ) 
 inline double
 nest::ht_neuron::get_g_NMDA_() const
 {
-  return S_.y_[ State_::G_NMDA_TIMECOURSE ] * m_NMDA_( S_.y_[ State_::V_M ],
-                                                m_eq_NMDA_( S_.y_[ State_::V_M ] ),
-                                                S_.y_[ State_::m_fast_NMDA ],
-                                                S_.y_[ State_::m_slow_NMDA ] );
+  return S_.y_[ State_::G_NMDA_TIMECOURSE ]
+    * m_NMDA_( S_.y_[ State_::V_M ],
+      m_eq_NMDA_( S_.y_[ State_::V_M ] ),
+      S_.y_[ State_::m_fast_NMDA ],
+      S_.y_[ State_::m_slow_NMDA ] );
 }
 
 /* ----------------------------------------------------------------
@@ -256,11 +258,13 @@ nest::ht_neuron::Parameters_::Parameters_()
   , E_rev_GABA_B( -90.0 )     // mV
   , g_peak_NaP( 1.0 )
   , E_rev_NaP( 30.0 ) // mV
+  , N_NaP( 3.0 )
   , g_peak_KNa( 1.0 )
   , E_rev_KNa( -90.0 )  // mV
   , tau_D_KNa( 1250.0 ) // ms
   , g_peak_T( 1.0 )
   , E_rev_T( 0.0 ) // mV
+  , N_T( 2.0 )
   , g_peak_h( 1.0 )
   , E_rev_h( -40.0 ) // mV
   , voltage_clamp( false )
@@ -304,24 +308,18 @@ nest::ht_neuron::State_::State_( const State_& s )
   }
 }
 
-nest::ht_neuron::State_& nest::ht_neuron::State_::operator=( const State_& s )
+nest::ht_neuron::State_&
+nest::ht_neuron::State_::operator=( const State_& s )
 {
-  if ( this == &s )
-  {
-    return *this;
-  }
-
   ref_steps_ = s.ref_steps_;
   I_NaP_ = s.I_NaP_;
   I_KNa_ = s.I_KNa_;
   I_T_ = s.I_T_;
   I_h_ = s.I_h_;
-
   for ( size_t i = 0; i < STATE_VEC_SIZE; ++i )
   {
     y_[ i ] = s.y_[ i ];
   }
-
   return *this;
 }
 
@@ -368,11 +366,13 @@ nest::ht_neuron::Parameters_::get( DictionaryDatum& d ) const
   def< double >( d, names::E_rev_GABA_B, E_rev_GABA_B );
   def< double >( d, names::g_peak_NaP, g_peak_NaP );
   def< double >( d, names::E_rev_NaP, E_rev_NaP );
+  def< double >( d, names::N_NaP, N_NaP );
   def< double >( d, names::g_peak_KNa, g_peak_KNa );
   def< double >( d, names::E_rev_KNa, E_rev_KNa );
   def< double >( d, names::tau_D_KNa, tau_D_KNa );
   def< double >( d, names::g_peak_T, g_peak_T );
   def< double >( d, names::E_rev_T, E_rev_T );
+  def< double >( d, names::N_T, N_T );
   def< double >( d, names::g_peak_h, g_peak_h );
   def< double >( d, names::E_rev_h, E_rev_h );
   def< bool >( d, names::voltage_clamp, voltage_clamp );
@@ -413,11 +413,13 @@ nest::ht_neuron::Parameters_::set( const DictionaryDatum& d, Node* node )
   updateValueParam< double >( d, names::E_rev_GABA_B, E_rev_GABA_B, node );
   updateValueParam< double >( d, names::g_peak_NaP, g_peak_NaP, node );
   updateValueParam< double >( d, names::E_rev_NaP, E_rev_NaP, node );
+  updateValueParam< double >( d, names::N_NaP, N_NaP, node );
   updateValueParam< double >( d, names::g_peak_KNa, g_peak_KNa, node );
   updateValueParam< double >( d, names::E_rev_KNa, E_rev_KNa, node );
   updateValueParam< double >( d, names::tau_D_KNa, tau_D_KNa, node );
   updateValueParam< double >( d, names::g_peak_T, g_peak_T, node );
   updateValueParam< double >( d, names::E_rev_T, E_rev_T, node );
+  updateValueParam< double >( d, names::N_T, N_T, node );
   updateValueParam< double >( d, names::g_peak_h, g_peak_h, node );
   updateValueParam< double >( d, names::E_rev_h, E_rev_h, node );
   updateValueParam< bool >( d, names::voltage_clamp, voltage_clamp, node );
@@ -580,9 +582,9 @@ nest::ht_neuron::State_::set( const DictionaryDatum& d, const ht_neuron& node, N
 nest::ht_neuron::Buffers_::Buffers_( ht_neuron& n )
   : logger_( n )
   , spike_inputs_( std::vector< RingBuffer >( SUP_SPIKE_RECEPTOR - 1 ) )
-  , s_( 0 )
-  , c_( 0 )
-  , e_( 0 )
+  , s_( nullptr )
+  , c_( nullptr )
+  , e_( nullptr )
   , step_( Time::get_resolution().get_ms() )
   , integration_step_( step_ )
   , I_stim_( 0.0 )
@@ -592,9 +594,9 @@ nest::ht_neuron::Buffers_::Buffers_( ht_neuron& n )
 nest::ht_neuron::Buffers_::Buffers_( const Buffers_&, ht_neuron& n )
   : logger_( n )
   , spike_inputs_( std::vector< RingBuffer >( SUP_SPIKE_RECEPTOR - 1 ) )
-  , s_( 0 )
-  , c_( 0 )
-  , e_( 0 )
+  , s_( nullptr )
+  , c_( nullptr )
+  , e_( nullptr )
   , step_( Time::get_resolution().get_ms() )
   , integration_step_( step_ )
   , I_stim_( 0.0 )
@@ -606,7 +608,7 @@ nest::ht_neuron::Buffers_::Buffers_( const Buffers_&, ht_neuron& n )
  * ---------------------------------------------------------------- */
 
 nest::ht_neuron::ht_neuron()
-  : Archiving_Node()
+  : ArchivingNode()
   , P_()
   , S_( *this, P_ )
   , B_( *this )
@@ -615,7 +617,7 @@ nest::ht_neuron::ht_neuron()
 }
 
 nest::ht_neuron::ht_neuron( const ht_neuron& n )
-  : Archiving_Node( n )
+  : ArchivingNode( n )
   , P_( n.P_ )
   , S_( n.S_ )
   , B_( n.B_, *this )
@@ -644,13 +646,6 @@ nest::ht_neuron::~ht_neuron()
  * ---------------------------------------------------------------- */
 
 void
-nest::ht_neuron::init_state_( const Node& proto )
-{
-  const ht_neuron& pr = downcast< ht_neuron >( proto );
-  S_ = pr.S_;
-}
-
-void
 nest::ht_neuron::init_buffers_()
 {
   // Reset spike buffers.
@@ -663,12 +658,12 @@ nest::ht_neuron::init_buffers_()
 
   B_.logger_.reset();
 
-  Archiving_Node::clear_history();
+  ArchivingNode::clear_history();
 
   B_.step_ = Time::get_resolution().get_ms();
   B_.integration_step_ = B_.step_;
 
-  if ( B_.s_ == 0 )
+  if ( not B_.s_ )
   {
     B_.s_ = gsl_odeiv_step_alloc( gsl_odeiv_step_rkf45, State_::STATE_VEC_SIZE );
   }
@@ -677,7 +672,7 @@ nest::ht_neuron::init_buffers_()
     gsl_odeiv_step_reset( B_.s_ );
   }
 
-  if ( B_.c_ == 0 )
+  if ( not B_.c_ )
   {
     B_.c_ = gsl_odeiv_control_y_new( 1e-3, 0.0 );
   }
@@ -686,7 +681,7 @@ nest::ht_neuron::init_buffers_()
     gsl_odeiv_control_init( B_.c_, 1e-3, 0.0, 1.0, 0.0 );
   }
 
-  if ( B_.e_ == 0 )
+  if ( not B_.e_ )
   {
     B_.e_ = gsl_odeiv_evolve_alloc( State_::STATE_VEC_SIZE );
   }
@@ -696,7 +691,7 @@ nest::ht_neuron::init_buffers_()
   }
 
   B_.sys_.function = ht_neuron_dynamics;
-  B_.sys_.jacobian = 0;
+  B_.sys_.jacobian = nullptr;
   B_.sys_.dimension = State_::STATE_VEC_SIZE;
   B_.sys_.params = reinterpret_cast< void* >( this );
 
@@ -706,38 +701,11 @@ nest::ht_neuron::init_buffers_()
 double
 nest::ht_neuron::get_synapse_constant( double tau_1, double tau_2, double g_peak )
 {
-  /* The solution to the beta function ODE obtained by the solver is
-   *
-   *   g(t) = c / ( a - b ) * ( e^(-b t) - e^(-a t) )
-   *
-   * with a = 1/tau_1, b = 1/tau_2, a != b. The maximum of this function is at
-   *
-   *   t* = 1/(a-b) ln a/b
-   *
-   * We want to scale the function so that
-   *
-   *   max g == g(t*) == g_peak
-   *
-   * We thus need to set
-   *
-   *   c = g_peak * ( a - b ) / ( e^(-b t*) - e^(-a t*) )
-   *
-   * See Rotter & Diesmann, Biol Cybern 81:381 (1999) and Roth and van Rossum,
-   * Ch 6, in De Schutter, Computational Modeling Methods for Neuroscientists,
-   * MIT Press, 2010.
-   */
-
-  const double t_peak = ( tau_2 * tau_1 ) * std::log( tau_2 / tau_1 ) / ( tau_2 - tau_1 );
-
-  const double prefactor = ( 1 / tau_1 ) - ( 1 / tau_2 );
-
-  const double peak_value = ( std::exp( -t_peak / tau_2 ) - std::exp( -t_peak / tau_1 ) );
-
-  return g_peak * prefactor / peak_value;
+  return g_peak * beta_normalization_factor( tau_1, tau_2 );
 }
 
 void
-nest::ht_neuron::calibrate()
+nest::ht_neuron::pre_run_hook()
 {
   // ensures initialization in case mm connected after Simulate
   B_.logger_.init();
@@ -763,7 +731,7 @@ nest::ht_neuron::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   DictionaryDatum receptor_type = new Dictionary();
 
@@ -788,7 +756,7 @@ nest::ht_neuron::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;
@@ -802,9 +770,6 @@ nest::ht_neuron::set_status( const DictionaryDatum& d )
 void
 ht_neuron::update( Time const& origin, const long from, const long to )
 {
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   for ( long lag = from; lag < to; ++lag )
   {
     double tt = 0.0; // it's all relative!

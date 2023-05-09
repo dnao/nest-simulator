@@ -51,28 +51,33 @@
 
 namespace nest
 {
-/** @BeginDocumentation
-@ingroup Devices
-@ingroup music
+/* BeginUserDocs: device, MUSIC
 
-Name: music_message_in_proxy - A device which receives message strings from
-                              MUSIC.
+Short description
++++++++++++++++++
 
-Description:
+A device which receives message strings from MUSIC
 
-A music_message_in_proxy can be used to receive message strings from
+Description
++++++++++++
+
+A ``music_message_in_proxy`` can be used to receive message strings from
 remote MUSIC applications in NEST.
 
 It uses the MUSIC library to receive message strings from other
-applications. The music_message_in_proxy represents an input port to
-which MUSIC can connect a message source. The music_message_in_proxy
+applications. The ``music_message_in_proxy`` represents an input port to
+which MUSIC can connect a message source. The ``music_message_in_proxy``
 can queried using GetStatus to retrieve the messages.
 
-Parameters:
+To clear the data array, the parameter ``n_messages`` can be set to 0.
+
+This model is only available if NEST was compiled with MUSIC.
+
+Parameters
+++++++++++
 
 The following properties are available in the status dictionary:
 
-\verbatim embed:rst
 ============ ======= =========================================================
  port_name   string  The name of the MUSIC input port to listen to (default:
                      message_in)
@@ -85,33 +90,21 @@ The following properties are available in the status dictionary:
  published   boolean A bool indicating if the port has been already published
                      with MUSIC
 ============ ======= =========================================================
-\endverbatim
 
-The parameter port_name can be set using SetStatus. The field n_messages
-can be set to 0 to clear the data arrays.
+See also
+++++++++
 
-Examples:
+music_event_out_proxy, music_event_in_proxy, music_cont_in_proxy
 
-    /music_message_in_proxy Create /mmip Set
-    10 Simulate
-    mmip GetStatus /data get /messages get 0 get /command Set
-    (Executing command ') command join ('.) join =
-    command cvx exec
+EndUserDocs */
 
-Author: Jochen Martin Eppler
-
-FirstVersion: July 2010
-
-Availability: Only when compiled with MUSIC
-
-SeeAlso: music_event_out_proxy, music_event_in_proxy, music_cont_in_proxy
-*/
 class MsgHandler : public MUSIC::MessageHandler
 {
   ArrayDatum messages;                 //!< The buffer for incoming message
   std::vector< double > message_times; //!< The buffer for incoming message
 
-  void operator()( double t, void* msg, size_t size )
+  void
+  operator()( double t, void* msg, size_t size )
   {
     message_times.push_back( t * 1000.0 );
     messages.push_back( std::string( static_cast< char* >( msg ), size ) );
@@ -163,9 +156,8 @@ public:
   void set_status( const DictionaryDatum& );
 
 private:
-  void init_state_( const Node& );
   void init_buffers_();
-  void calibrate();
+  void pre_run_hook();
 
   void
   update( Time const&, const long, const long )
@@ -180,13 +172,12 @@ private:
     std::string port_name_;     //!< the name of MUSIC port to connect to
     double acceptable_latency_; //!< the acceptable latency of the port
 
-    Parameters_();                     //!< Sets default parameter values
-    Parameters_( const Parameters_& ); //!< Recalibrate all times
+    Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;
 
     /**
-     * Set values from dicitonary.
+     * Set values from dictionary.
      */
     void set( const DictionaryDatum&, State_&, Node* );
   };

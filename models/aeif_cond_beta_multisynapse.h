@@ -56,56 +56,68 @@ namespace nest
  */
 extern "C" int aeif_cond_beta_multisynapse_dynamics( double, const double*, double*, void* );
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingroup aeif
-@ingroup cond
+/* BeginUserDocs: neuron, adaptive threshold, integrate-and-fire, conductance-based
 
-Name: aeif_cond_beta_multisynapse - Conductance based adaptive exponential
-                                     integrate-and-fire neuron model according
-                                     to Brette and Gerstner (2005) with
-                                     multiple synaptic rise time and decay
-                                     time constants, and synaptic conductance
-                                     modeled by a beta function.
+Short description
++++++++++++++++++
 
-Description:
+Conductance based adaptive exponential integrate-and-fire neuron model
 
-aeif_cond_beta_multisynapse is a conductance-based adaptive exponential
-integrate-and-fire neuron model. It allows an arbitrary number of synaptic
+Description
++++++++++++
+
+``aeif_cond_beta_multisynapse`` is a conductance-based adaptive exponential
+integrate-and-fire neuron model, according to Brette and Gerstner (2005) with
+multiple synaptic rise time and decay time constants, and synaptic conductance
+modeled by a beta function.
+
+It allows an arbitrary number of synaptic
 rise time and decay time constants. Synaptic conductance is modeled by a
 beta function, as described by A. Roth and M.C.W. van Rossum
 in Computational Modeling Methods for Neuroscientists, MIT Press 2013,
 Chapter 6.
 
-The time constants are supplied by two arrays, "tau_rise" and "tau_decay" for
+The time constants are supplied by two arrays, ``tau_rise`` and ``tau_decay`` for
 the synaptic rise time and decay time, respectively. The synaptic
-reversal potentials are supplied by the array "E_rev". The port numbers
+reversal potentials are supplied by the array ``E_rev``. The port numbers
 are automatically assigned in the range from 1 to n_receptors.
-During connection, the ports are selected with the property "receptor_type".
+During connection, the ports are selected with the property ``receptor_type``.
+
+When connecting to conductance-based multisynapse models, all synaptic weights
+must be non-negative.
 
 The membrane potential is given by the following differential equation:
-@f[
- C dV/dt = -g_L(V-E_L) + g_L*\Delta_T*\exp((V-V_T)/\Delta_T)
+
+.. math::
+
+ C dV/dt = -g_L(V-E_L) + g_L \cdot \Delta_T \cdot \exp((V-V_T)/\Delta_T)
  + I_{syn_{tot}}(V, t) - w + I_e
-@f]
+
 
 where:
 
-@f[ I_{syn_{tot}}(V,t) = \sum_i g_i(t) (V - E_{rev,i}) , @f]
+.. math::
 
-the synapse i is excitatory or inhibitory depending on the value of
-\f$ E_{rev,i} \f$
-and the differential equation for the spike-adaptation current w is:
+ I_{syn_{tot}}(V,t) = \sum_i g_i(t) (V - E_{rev,i}) ,
 
-@f[ \tau_w * dw/dt = a(V - E_L) - w @f]
+the synapse `i` is excitatory or inhibitory depending on the value of
+:math:`E_{rev,i}`
+and the differential equation for the spike-adaptation current `w` is:
 
-When the neuron fires a spike, the adaptation current w <- w + b.
+.. math::
 
-Parameters:
+ \tau_w \cdot dw/dt = a(V - E_L) - w
+
+When the neuron fires a spike, the adaptation current `w <- w + b`.
+
+For implementation details see the
+`aeif_models_implementation <../model_details/aeif_models_implementation.ipynb>`_ notebook.
+
+Parameters
+++++++++++
+
 The following parameters can be set in the status dictionary.
 
-\verbatim embed:rst
 ======== ======= =======================================
 **Dynamic state variables:**
 --------------------------------------------------------
@@ -149,58 +161,31 @@ gsl_error_tol real    This parameter controls the admissible error of the
                       GSL integrator. Reduce it if NEST complains about
                       numerical instabilities.
 ============= ======= =========================================================
-\endverbatim
 
-Examples:
+Sends
++++++
 
-    import nest
-    import numpy as np
+SpikeEvent
 
-    neuron = nest.Create('aeif_cond_beta_multisynapse')
-    nest.SetStatus(neuron, {"V_peak": 0.0, "a": 4.0, "b":80.5})
-    nest.SetStatus(neuron, {'E_rev':[0.0,0.0,0.0,-85.0],
-                            'tau_decay':[50.0,20.0,20.0,20.0],
-                            'tau_rise':[10.0,10.0,1.0,1.0]})
+Receives
+++++++++
 
-    spike = nest.Create('spike_generator', params = {'spike_times':
-                                                    np.array([10.0])})
+SpikeEvent, CurrentEvent, DataLoggingRequest
 
-    voltmeter = nest.Create('voltmeter')
+See also
+++++++++
 
-    delays=[1.0, 300.0, 500.0, 700.0]
-    w=[1.0, 1.0, 1.0, 1.0]
-    for syn in range(4):
-        nest.Connect(spike, neuron, syn_spec={'model': 'static_synapse',
-                                              'receptor_type': 1 + syn,
-                                              'weight': w[syn],
-                                              'delay': delays[syn]})
+aeif_cond_alpha_multisynapse
 
-    nest.Connect(voltmeter, neuron)
+EndUserDocs */
 
-    nest.Simulate(1000.0)
-    dmm = nest.GetStatus(voltmeter)[0]
-    Vms = dmm["events"]["V_m"]
-    ts = dmm["events"]["times"]
-    import pylab
-    pylab.figure(2)
-    pylab.plot(ts, Vms)
-    pylab.show()
-
-Sends: SpikeEvent
-
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
-
-Author: Bruno Golosio 07/10/2016
-
-SeeAlso: aeif_cond_alpha_multisynapse
-*/
-class aeif_cond_beta_multisynapse : public Archiving_Node
+class aeif_cond_beta_multisynapse : public ArchivingNode
 {
 
 public:
   aeif_cond_beta_multisynapse();
   aeif_cond_beta_multisynapse( const aeif_cond_beta_multisynapse& );
-  virtual ~aeif_cond_beta_multisynapse();
+  ~aeif_cond_beta_multisynapse() override;
 
   friend int aeif_cond_beta_multisynapse_dynamics( double, const double*, double*, void* );
 
@@ -212,24 +197,23 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void init_buffers_() override;
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   // The next three classes need to be friends to access the State_ class/member
   friend class DynamicRecordablesMap< aeif_cond_beta_multisynapse >;
@@ -250,24 +234,21 @@ private:
     double g_L;     //!< Leak Conductance in nS
     double C_m;     //!< Membrane Capacitance in pF
     double E_L;     //!< Leak reversal Potential (aka resting potential) in mV
-    double Delta_T; //!< Slope faktor in ms.
-    double tau_w;   //!< adaptation time-constant in ms.
-    double a;       //!< Subthreshold adaptation in nS.
+    double Delta_T; //!< Slope factor in mV
+    double tau_w;   //!< adaptation time-constant in ms
+    double a;       //!< Subthreshold adaptation in nS
     double b;       //!< Spike-triggered adaptation in pA
-    double V_th;    //!< Spike threshold in mV.
+    double V_th;    //!< Spike threshold in mV
 
-    std::vector< double > tau_rise;  //!< Rise time of synaptic conductance
-                                     //!< in ms.
-    std::vector< double > tau_decay; //!< Decay time of synaptic conductance
-                                     //!< in ms.
-    std::vector< double > E_rev;     //!< reversal potentials in mV
+    std::vector< double > tau_rise;  //!< Rise time of synaptic conductance in ms
+    std::vector< double > tau_decay; //!< Decay time of synaptic conductance in ms
+    std::vector< double > E_rev;     //!< Reversal potentials in mV
 
-    double I_e; //!< Intrinsic current in pA.
+    double I_e; //!< Intrinsic current in pA
 
-    double gsl_error_tol; //!< error bound for GSL integrator
+    double gsl_error_tol; //!< Error bound for GSL integrator
 
-    // boolean flag which indicates whether the neuron has connections
-    bool has_connections_;
+    bool has_connections_; //!< Boolean flag which indicates whether the neuron has connections
 
     Parameters_(); //!< Sets default parameter values
 
@@ -286,8 +267,7 @@ private:
 
   /**
    * State variables of the model.
-   * @note Copy constructor and assignment operator required because
-   *       of C-style arrays.
+   * @note Copy constructor required because of C-style arrays.
    */
   struct State_
   {
@@ -315,8 +295,6 @@ private:
     int r_;                   //!< number of refractory steps remaining
 
     State_( const Parameters_& ); //!< Default initialization
-    State_( const State_& );
-    State_& operator=( const State_& );
 
     void get( DictionaryDatum& ) const;
     void set( const DictionaryDatum&, Node* node );
@@ -346,7 +324,7 @@ private:
     gsl_odeiv_evolve* e_;  //!< evolution function
     gsl_odeiv_system sys_; //!< struct describing system
 
-    // Since IntergrationStep_ is initialized with step_, and the resolution
+    // Since IntegrationStep_ is initialized with step_, and the resolution
     // cannot change after nodes have been created, it is safe to place both
     // here.
     double step_;            //!< simulation step size in ms
@@ -452,7 +430,7 @@ aeif_cond_beta_multisynapse::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }

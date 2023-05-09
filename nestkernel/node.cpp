@@ -43,10 +43,10 @@ Node::Node()
   , node_id_( 0 )
   , thread_lid_( invalid_index )
   , model_id_( -1 )
-  , thread_( 0 )
-  , vp_( invalid_thread_ )
+  , thread_( invalid_thread )
+  , vp_( invalid_thread )
   , frozen_( false )
-  , buffers_initialized_( false )
+  , initialized_( false )
   , node_uses_wfr_( false )
 {
 }
@@ -60,7 +60,7 @@ Node::Node( const Node& n )
   , vp_( n.vp_ )
   , frozen_( n.frozen_ )
   // copy must always initialized its own buffers
-  , buffers_initialized_( false )
+  , initialized_( false )
   , node_uses_wfr_( n.node_uses_wfr_ )
 {
 }
@@ -70,29 +70,22 @@ Node::~Node()
 }
 
 void
-Node::init_state()
-{
-  Model const* const model = kernel().model_manager.get_model( model_id_ );
-  assert( model );
-  init_state_( model->get_prototype() );
-}
-
-void
-Node::init_state_( Node const& )
+Node::init_state_()
 {
 }
 
 void
-Node::init_buffers()
+Node::init()
 {
-  if ( buffers_initialized_ )
+  if ( initialized_ )
   {
     return;
   }
 
+  init_state_();
   init_buffers_();
 
-  buffers_initialized_ = true;
+  initialized_ = true;
 }
 
 void
@@ -104,7 +97,6 @@ void
 Node::set_initialized()
 {
   set_initialized_();
-  initialized_ = true;
 }
 
 void
@@ -120,18 +112,14 @@ Node::get_name() const
     return std::string( "UnknownNode" );
   }
 
-  return kernel().model_manager.get_model( model_id_ )->get_name();
+  return kernel().model_manager.get_node_model( model_id_ )->get_name();
 }
 
 Model&
 Node::get_model_() const
 {
-  if ( model_id_ < 0 )
-  {
-    throw UnknownModelID( model_id_ );
-  }
-
-  return *kernel().model_manager.get_model( model_id_ );
+  assert( model_id_ >= 0 );
+  return *kernel().model_manager.get_node_model( model_id_ );
 }
 
 DictionaryDatum
@@ -141,15 +129,16 @@ Node::get_status_dict_()
 }
 
 void
-Node::set_local_device_id( const index lsdid )
+Node::set_local_device_id( const index )
 {
-  assert( false && "set_local_device_id() called on a non-device node of type" );
+  assert( false and "set_local_device_id() called on a non-device node of type" );
 }
 
 index
 Node::get_local_device_id() const
 {
-  assert( false && "set_local_device_id() called on a non-device node." );
+  assert( false and "get_local_device_id() called on a non-device node." );
+  return invalid_index;
 }
 
 DictionaryDatum
@@ -160,6 +149,7 @@ Node::get_status_base()
   // add information available for all nodes
   ( *dict )[ names::local ] = kernel().node_manager.is_local_node( this );
   ( *dict )[ names::model ] = LiteralDatum( get_name() );
+  ( *dict )[ names::model_id ] = get_model_id();
   ( *dict )[ names::global_id ] = get_node_id();
   ( *dict )[ names::vp ] = get_vp();
   ( *dict )[ names::element_type ] = LiteralDatum( get_element_type() );
@@ -206,13 +196,14 @@ Node::wfr_update( Time const&, const long, const long )
 }
 
 /**
- * Default implementation of check_connection just throws UnexpectedEvent
+ * Default implementation of check_connection just throws IllegalConnection
  */
 port
 Node::send_test_event( Node&, rport, synindex, bool )
 {
-  throw UnexpectedEvent(
-    "Source node does not send output. Note that detectors need to be connected as Connect(neuron, detector)." );
+  throw IllegalConnection(
+    "Source node does not send output.\n"
+    "  Note that recorders must be connected as Connect(neuron, recorder)." );
 }
 
 /**
@@ -290,9 +281,7 @@ Node::handle( DataLoggingRequest& )
 port
 Node::handles_test_event( DataLoggingRequest&, rport )
 {
-  throw IllegalConnection(
-    "Possible cause: only static synapse types may be used to connect "
-    "devices." );
+  throw IllegalConnection( "The target node or synapse model does not support data logging requests." );
 }
 
 void
@@ -322,23 +311,19 @@ Node::handle( DoubleDataEvent& )
 port
 Node::handles_test_event( DoubleDataEvent&, rport )
 {
-  throw IllegalConnection();
+  throw IllegalConnection( "The target node or synapse model does not support double data event." );
 }
 
 port
 Node::handles_test_event( DSSpikeEvent&, rport )
 {
-  throw IllegalConnection(
-    "Possible cause: only static synapse types may be used to connect "
-    "devices." );
+  throw IllegalConnection( "The target node or synapse model does not support spike input." );
 }
 
 port
 Node::handles_test_event( DSCurrentEvent&, rport )
 {
-  throw IllegalConnection(
-    "Possible cause: only static synapse types may be used to connect "
-    "devices." );
+  throw IllegalConnection( "The target node or synapse model does not support DS current input." );
 }
 
 void
@@ -351,7 +336,6 @@ port
 Node::handles_test_event( GapJunctionEvent&, rport )
 {
   throw IllegalConnection( "The target node or synapse model does not support gap junction input." );
-  return invalid_port_;
 }
 
 void
@@ -370,7 +354,6 @@ port
 Node::handles_test_event( InstantaneousRateConnectionEvent&, rport )
 {
   throw IllegalConnection( "The target node or synapse model does not support instantaneous rate input." );
-  return invalid_port_;
 }
 
 void
@@ -389,7 +372,6 @@ port
 Node::handles_test_event( DiffusionConnectionEvent&, rport )
 {
   throw IllegalConnection( "The target node or synapse model does not support diffusion input." );
-  return invalid_port_;
 }
 
 void
@@ -408,7 +390,6 @@ port
 Node::handles_test_event( DelayedRateConnectionEvent&, rport )
 {
   throw IllegalConnection( "The target node or synapse model does not support delayed rate input." );
-  return invalid_port_;
 }
 
 void
@@ -446,8 +427,54 @@ nest::Node::get_history( double, double, std::deque< histentry >::iterator*, std
 void
 nest::Node::get_LTP_history( double,
   double,
-  std::deque< histentry_cl >::iterator*,
-  std::deque< histentry_cl >::iterator* )
+  std::deque< histentry_extended >::iterator*,
+  std::deque< histentry_extended >::iterator* )
+{
+  throw UnexpectedEvent();
+}
+
+void
+nest::Node::get_urbanczik_history( double,
+  double,
+  std::deque< histentry_extended >::iterator*,
+  std::deque< histentry_extended >::iterator*,
+  int )
+{
+  throw UnexpectedEvent();
+}
+
+double
+nest::Node::get_C_m( int )
+{
+  throw UnexpectedEvent();
+}
+
+double
+nest::Node::get_g_L( int )
+{
+  throw UnexpectedEvent();
+}
+
+double
+nest::Node::get_tau_L( int )
+{
+  throw UnexpectedEvent();
+}
+
+double
+nest::Node::get_tau_s( int )
+{
+  throw UnexpectedEvent();
+}
+
+double
+nest::Node::get_tau_syn_ex( int )
+{
+  throw UnexpectedEvent();
+}
+
+double
+nest::Node::get_tau_syn_in( int )
 {
   throw UnexpectedEvent();
 }

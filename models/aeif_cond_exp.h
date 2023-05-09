@@ -68,40 +68,49 @@ extern "C" int aeif_cond_exp_dynamics( double, const double*, double*, void* );
  */
 extern "C" int aeif_cond_exp_dynamics_DT0( double, const double*, double*, void* );
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingroup aeif
-@ingroup cond
+/* BeginUserDocs: neuron, adaptive threshold, integrate-and-fire, conductance-based
 
-Name: aeif_cond_exp - Conductance based exponential integrate-and-fire neuron
-                      model according to Brette and Gerstner (2005).
+Short description
++++++++++++++++++
 
-Description:
+Conductance based exponential integrate-and-fire neuron model
 
-aeif_cond_exp is the adaptive exponential integrate and fire neuron
-according to Brette and Gerstner (2005), with post-synaptic
+Description
++++++++++++
+
+``aeif_cond_exp`` is the adaptive exponential integrate and fire neuron
+according to Brette and Gerstner (2005), with postsynaptic
 conductances in the form of truncated exponentials.
 
 This implementation uses the embedded 4th order Runge-Kutta-Fehlberg
 solver with adaptive stepsize to integrate the differential equation.
 
 The membrane potential is given by the following differential equation:
-@f[ C dV/dt= -g_L(V-E_L)+g_L*\Delta_T*\exp((V-V_T)/\Delta_T)-g_e(t)(V-E_e) \\
-                                                     -g_i(t)(V-E_i)-w +I_e @f]
+
+.. math::
+
+ C dV/dt= -g_L(V-E_L)+g_L \cdot \Delta_T \cdot \exp((V-V_T)/\Delta_T)-g_e(t)(V-E_e) \\
+                                                     -g_i(t)(V-E_i)-w +I_e
 
 and
 
-@f[ \tau_w * dw/dt= a(V-E_L) -W @f]
+.. math::
+
+ \tau_w \cdot dw/dt= a(V-E_L) -W
 
 Note that the spike detection threshold V_peak is automatically set to
-\f$ V_th+10 mV \f$ to avoid numerical instabilites that may result from
+:math:`V_th+10 mV` to avoid numerical instabilities that may result from
 setting V_peak too high.
 
-Parameters:
-The following parameters can be set in the status dictionary.
+For implementation details see the
+`aeif_models_implementation <../model_details/aeif_models_implementation.ipynb>`_ notebook.
 
-\verbatim embed:rst
+See also [1]_.
+
+
+Parameters:
++++++++++++++
+The following parameters can be set in the status dictionary.
 
 ======== ======= =======================================
 **Dynamic state variables:**
@@ -138,11 +147,11 @@ The following parameters can be set in the status dictionary.
 **Synaptic parameters**
 -------------------------------------------------------------------------------
  E_ex       mV      Excitatory reversal potential
- tau_syn_ex ms      Rise time of excitatory synaptic conductance (alpha
-                    function)
+ tau_syn_ex ms      Exponential decay time constant of excitatory synaptic
+                    conductance kernel
  E_in       mV      Inhibitory reversal potential
- tau_syn_in ms      Rise time of the inhibitory synaptic conductance
-                    (alpha function)
+ tau_syn_in ms      Exponential decay time constant of inhibitory synaptic
+                    conductance kernel
 =========== ======= ===========================================================
 
 ============= ======= =========================================================
@@ -152,31 +161,40 @@ gsl_error_tol real    This parameter controls the admissible error of the
                       GSL integrator. Reduce it if NEST complains about
                       numerical instabilities.
 ============= ======= =========================================================
-\endverbatim
 
-Author: Adapted from aeif_cond_alpha by Lyle Muller; full revision by Tanguy
-Fardet on December 2016
+Sends
++++++
 
-Sends: SpikeEvent
+SpikeEvent
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+Receives
+++++++++
 
-\verbatim embed:rst
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+References
+++++++++++
+
 .. [1] Brette R and Gerstner W (2005). Adaptive Exponential
        Integrate-and-Fire Model as an Effective Description of Neuronal
        Activity. J Neurophysiol 94:3637-3642.
        DOI: https://doi.org/10.1152/jn.00686.2005
-\endverbatim
 
-SeeAlso: iaf_cond_exp, aeif_cond_alpha
-*/
-class aeif_cond_exp : public Archiving_Node
+
+See also
+++++++++
+
+iaf_cond_exp, aeif_cond_alpha
+
+EndUserDocs */
+
+class aeif_cond_exp : public ArchivingNode
 {
 
 public:
   aeif_cond_exp();
   aeif_cond_exp( const aeif_cond_exp& );
-  ~aeif_cond_exp();
+  ~aeif_cond_exp() override;
 
   /**
    * Import sets of overloaded virtual functions.
@@ -186,24 +204,23 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
-  void update( const Time&, const long, const long );
+  void init_buffers_() override;
+  void pre_run_hook() override;
+  void update( const Time&, const long, const long ) override;
 
   // END Boilerplate function declarations ----------------------------
 
@@ -231,22 +248,21 @@ private:
     double E_ex;       //!< Excitatory reversal Potential in mV
     double E_in;       //!< Inhibitory reversal Potential in mV
     double E_L;        //!< Leak reversal Potential (aka resting potential) in mV
-    double Delta_T;    //!< Slope faktor in ms.
-    double tau_w;      //!< adaptation time-constant in ms.
-    double a;          //!< Subthreshold adaptation in nS.
+    double Delta_T;    //!< Slope factor in mV
+    double tau_w;      //!< Adaptation time-constant in ms
+    double a;          //!< Subthreshold adaptation in nS
     double b;          //!< Spike-triggered adaptation in pA
-    double V_th;       //!< Spike threshold in mV.
-    double t_ref;      //!< Refractory period in ms.
-    double tau_syn_ex; //!< Excitatory synaptic rise time.
-    double tau_syn_in; //!< Excitatory synaptic rise time.
-    double I_e;        //!< Intrinsic current in pA.
+    double V_th;       //!< Spike threshold in mV
+    double tau_syn_ex; //!< Excitatory synaptic kernel decay time in ms
+    double tau_syn_in; //!< Inhibitory synaptic kernel decay time in ms
+    double I_e;        //!< Intrinsic current in pA
 
-    double gsl_error_tol; //!< error bound for GSL integrator
+    double gsl_error_tol; //!< Error bound for GSL integrator
 
     Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;             //!< Store current values in dictionary
-    void set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
 public:
@@ -254,8 +270,7 @@ public:
 
   /**
    * State variables of the model.
-   * @note Copy constructor and assignment operator required because
-   *       of C-style array.
+   * @note Copy constructor required because of C-style array.
    */
   struct State_
   {
@@ -280,6 +295,7 @@ public:
 
     State_( const Parameters_& ); //!< Default initialization
     State_( const State_& );
+
     State_& operator=( const State_& );
 
     void get( DictionaryDatum& ) const;
@@ -293,8 +309,8 @@ public:
    */
   struct Buffers_
   {
-    Buffers_( aeif_cond_exp& );                  //!<Sets buffer pointers to 0
-    Buffers_( const Buffers_&, aeif_cond_exp& ); //!<Sets buffer pointers to 0
+    Buffers_( aeif_cond_exp& );                  //!< Sets buffer pointers to 0
+    Buffers_( const Buffers_&, aeif_cond_exp& ); //!< Sets buffer pointers to 0
 
     //! Logger for all analog data
     UniversalDataLogger< aeif_cond_exp > logger_;
@@ -310,7 +326,7 @@ public:
     gsl_odeiv_evolve* e_;  //!< evolution function
     gsl_odeiv_system sys_; //!< struct describing the GSL system
 
-    // Since IntergrationStep_ is initialized with step_, and the resolution
+    // Since IntegrationStep_ is initialized with step_, and the resolution
     // cannot change after nodes have been created, it is safe to place both
     // here.
     double step_;            //!< step size in ms
@@ -407,7 +423,7 @@ aeif_cond_exp::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -424,7 +440,7 @@ aeif_cond_exp::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

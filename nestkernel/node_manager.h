@@ -28,11 +28,12 @@
 
 // Includes from libnestutil:
 #include "manager_interface.h"
+#include "stopwatch.h"
 
 // Includes from nestkernel:
 #include "conn_builder.h"
-#include "node_collection.h"
 #include "nest_types.h"
+#include "node_collection.h"
 #include "sparse_node_array.h"
 
 // Includes from sli:
@@ -49,13 +50,13 @@ class NodeManager : public ManagerInterface
 {
 public:
   NodeManager();
-  ~NodeManager();
+  ~NodeManager() override;
 
-  virtual void initialize();
-  virtual void finalize();
-
-  virtual void set_status( const DictionaryDatum& );
-  virtual void get_status( DictionaryDatum& );
+  void initialize() override;
+  void finalize() override;
+  void change_number_of_threads() override;
+  void set_status( const DictionaryDatum& ) override;
+  void get_status( DictionaryDatum& ) override;
 
   /**
    * Get properties of a node. The specified node must exist.
@@ -80,7 +81,6 @@ public:
    * @param n Number of Nodes to be created. Defaults to 1 if not
    * specified.
    * @returns NodeCollection as lock pointer
-   * @throws nest::UnknownModelID
    */
   NodeCollectionPTR add_node( index m, long n = 1 );
 
@@ -99,12 +99,6 @@ public:
    * @returns NodeCollection as lock pointer
    */
   NodeCollectionPTR get_nodes( const DictionaryDatum& dict, const bool local_only );
-
-  /**
-   * Set the state (observable dynamic variables) of a node to model defaults.
-   * @see Node::init_state()
-   */
-  void init_state( index );
 
   /**
    * Return total number of network nodes.
@@ -295,12 +289,11 @@ private:
    */
   void add_music_nodes_( Model& model, index min_node_id, index max_node_id, NodeCollectionPTR nc_ptr );
 
-
 private:
   /**
    * The network as sparse array of local nodes. One entry per thread,
    * which contains only the thread-local nodes.
-  */
+   */
   std::vector< SparseNodeArray > local_nodes_;
 
   std::vector< std::vector< Node* > > wfr_nodes_vec_; //!< Nodelists for unfrozen nodes that
@@ -318,6 +311,9 @@ private:
 
   //! Store exceptions raised in thread-parallel sections for later handling
   std::vector< std::shared_ptr< WrappedThreadException > > exceptions_raised_;
+
+  // private stop watch for benchmarking purposes
+  Stopwatch sw_construction_create_;
 };
 
 inline index

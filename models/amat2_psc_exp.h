@@ -35,30 +35,32 @@
 
 namespace nest
 {
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingroup psc
 
-Name: amat2_psc_exp - Non-resetting leaky integrate-and-fire neuron model
-                      with exponential PSCs and adaptive threshold.
+/* BeginUserDocs: neuron, integrate-and-fire, current-based
 
-Description:
+Short description
++++++++++++++++++
 
-amat2_psc_exp is an implementation of a leaky integrate-and-fire model
+Non-resetting leaky integrate-and-fire neuron model with exponential
+PSCs and adaptive threshold
+
+Description
++++++++++++
+
+``amat2_psc_exp`` is an implementation of a leaky integrate-and-fire model
 with exponential shaped postsynaptic currents (PSCs). Thus, postsynaptic
 currents have an infinitely short rise time.
 
 The threshold is lifted when the neuron is fired and then decreases in a
-fixed time scale toward a fixed level [3].
+fixed time scale toward a fixed level [3]_.
 
 The threshold crossing is followed by a total refractory period
 during which the neuron is not allowed to fire, even if the membrane
 potential exceeds the threshold. The membrane potential is NOT reset,
 but continuously integrated.
 
-The linear subthresold dynamics is integrated by the Exact
-Integration scheme [1]. The neuron dynamics is solved on the time
+The linear subthreshold dynamics is integrated by the Exact
+Integration scheme [1]_. The neuron dynamics is solved on the time
 grid given by the computation step size. Incoming as well as emitted
 spikes are forced to that grid.
 
@@ -67,28 +69,27 @@ equation represents a piecewise constant external current.
 
 The general framework for the consistent formulation of systems with
 neuron like dynamics interacting by point events is described in
-[1]. A flow chart can be found in [2].
+[1]_. A flow chart can be found in [2]_.
 
-Remarks:
+The default parameter values for this model are different from the
+corresponding parameter values for ``mat2_psc_exp``. If identical
+parameters are used, and beta is 0, then this model shall behave
+exactly as mat2_psc_exp.
 
-- The default parameter values for this model are different from the
-  corresponding parameter values for mat2_psc_exp.
-- If identical parameters are used, and beta==0, then this model shall
-  behave exactly as mat2_psc_exp.
-- The time constants in the model must fullfill the following conditions:
-  - \f$ \tau_m != {\tau_{syn_{ex}}, \tau_{syn_{in}}} \f$
-  - \f$ \tau_v != {\tau_{syn_{ex}}, \tau_{syn_{in}}} \f$
-  - \f$ \tau_m != \tau_v \f$
-  This is required to avoid singularities in the numerics. This is a
-  problem of implementation only, not a principal problem of the model.
-- Expect unstable numerics if time constants that are required to be
-  different are very close.
+The following state variables can be read out using a multimeter:
 
-Parameters:
+=========== ==== ==================================
+ V_m        mV   Non-resetting membrane potential
+ V_th       mV   Two-timescale adaptive threshold
+=========== ==== ==================================
+
+See also [4]_.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary:
 
-\verbatim embed:rst
 =========== ======= ===========================================================
  C_m        pF      Capacity of the membrane
  E_L        mV      Resting potential
@@ -108,28 +109,28 @@ The following parameters can be set in the status dictionary:
  beta       1/ms    Scaling coefficient for voltage-dependent threshold
                     component [3, eqs 16-17]
  omega      mV      Resting spike threshold (absolute value, not
-                    relative to E_L as in [3])
+                    relative to E_L as in [3]_)
 =========== ======= ===========================================================
 
+.. note::
 
-=========== ==== =======================================================
-**State variables that can be read out with the multimeter device**
-------------------------------------------------------------------------
- V_m        mV   Non-resetting membrane potential
- V_th       mV   Two-timescale adaptive threshold
-=========== ==== =======================================================
-\endverbatim
+   - The time constants in the model must fulfill the following conditions:
+     - :math:`\tau_m != {\tau_{syn_{ex}}, \tau_{syn_{in}}}`
+     - :math:`\tau_v != {\tau_{syn_{ex}}, \tau_{syn_{in}}}`
+     - :math:`\tau_m != \tau_v`
+     This is required to avoid singularities in the numerics. This is a
+     problem of implementation only, not a principal problem of the model.
 
-Remarks:
+   - Expect unstable numerics if time constants that are required to be
+     different are very close.
 
-\f$ \tau_m != \tau_{syn_{ex,in}} \f$ is required by the current implementation
-to
-avoid a degenerate case of the ODE describing the model [1].
-For very similar values, numerics will be unstable.
+   - :math:`\tau_m != \tau_{syn_{ex,in}}` is required by the current
+     implementation to avoid a degenerate case of the ODE describing the
+     model [1]_.  For very similar values, numerics will be unstable.
 
-References:
+References
+++++++++++
 
-\verbatim embed:rst
 .. [1] Rotter S, Diesmann M (1999). Exact simulation of
        time-invariant linear systems with applications to neuronal
        modeling. Biologial Cybernetics 81:381-402.
@@ -146,18 +147,20 @@ References:
        for reproducing diverse firing patterns and predicting precise
        firing times. Frontiers in Computational Neuroscience, 5:42.
        DOI: https://doi.org/10.3389/fncom.2011.00042
-\endverbatim
 
-Sends: SpikeEvent
+Sends
++++++
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+SpikeEvent
 
-FirstVersion: April 2013
+Receives
+++++++++
 
-Author: Thomas Heiberg & Hans E. Plesser (modified mat2_psc_exp model of
-Thomas Pfeil)
-*/
-class amat2_psc_exp : public Archiving_Node
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+EndUserDocs */
+
+class amat2_psc_exp : public ArchivingNode
 {
 
 public:
@@ -172,24 +175,23 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void init_buffers_() override;
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access private members
   friend class RecordablesMap< amat2_psc_exp >;
@@ -240,7 +242,7 @@ private:
     /** Resting threshold in mV
         (relative to resting potential).
         The real resting threshold is (E_L_+omega_).
-        Called omega in [3]. */
+        Called omega in [3]_. */
     double omega_;
 
     Parameters_(); //!< Sets default parameter values
@@ -250,7 +252,7 @@ private:
     /** Set values from dictionary.
      * @returns Change in reversal potential E_L, to be passed to State_::set()
      */
-    double set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    double set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
   // ----------------------------------------------------------------
@@ -294,8 +296,8 @@ private:
    */
   struct Buffers_
   {
-    Buffers_( amat2_psc_exp& );                  //!<Sets buffer pointers to 0
-    Buffers_( const Buffers_&, amat2_psc_exp& ); //!<Sets buffer pointers to 0
+    Buffers_( amat2_psc_exp& );                  //!< Sets buffer pointers to 0
+    Buffers_( const Buffers_&, amat2_psc_exp& ); //!< Sets buffer pointers to 0
 
     /** buffers and sums up incoming spikes/currents */
     RingBuffer spikes_ex_;
@@ -315,7 +317,7 @@ private:
   {
 
     /** Amplitude of the synaptic current.
-    This value is chosen such that a post-synaptic potential with
+    This value is chosen such that a postsynaptic potential with
     weight one has an amplitude of 1 mV.
     @note mog - I assume this, not checked.
     */
@@ -441,7 +443,7 @@ amat2_psc_exp::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d, P_ );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -458,7 +460,7 @@ amat2_psc_exp::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

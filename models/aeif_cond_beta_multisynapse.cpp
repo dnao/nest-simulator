@@ -28,6 +28,7 @@
 #include <limits>
 
 // Includes from libnestutil:
+#include "beta_normalization_factor.h"
 #include "dict_util.h"
 #include "numerics.h"
 
@@ -39,8 +40,6 @@
 // Includes from sli:
 #include "dict.h"
 #include "dictutils.h"
-#include "doubledatum.h"
-#include "integerdatum.h"
 
 namespace nest // template specialization must be placed in namespace
 {
@@ -124,8 +123,9 @@ aeif_cond_beta_multisynapse_dynamics( double, const double y[], double f[], void
     node.P_.Delta_T == 0. ? 0 : ( node.P_.Delta_T * node.P_.g_L * std::exp( ( V - node.P_.V_th ) / node.P_.Delta_T ) );
 
   // dv/dt
-  f[ S::V_M ] = is_refractory ? 0 : ( -node.P_.g_L * ( V - node.P_.E_L ) + I_spike + I_syn - w + node.P_.I_e
-                                      + node.B_.I_stim_ ) / node.P_.C_m;
+  f[ S::V_M ] = is_refractory
+    ? 0
+    : ( -node.P_.g_L * ( V - node.P_.E_L ) + I_spike + I_syn - w + node.P_.I_e + node.B_.I_stim_ ) / node.P_.C_m;
 
   // Adaptation current w.
   f[ S::W ] = ( node.P_.a * ( V - node.P_.E_L ) - w ) / node.P_.tau_w;
@@ -171,21 +171,6 @@ aeif_cond_beta_multisynapse::State_::State_( const Parameters_& p )
   , r_( 0 )
 {
   y_[ 0 ] = p.E_L;
-}
-
-aeif_cond_beta_multisynapse::State_::State_( const State_& s )
-  : r_( s.r_ )
-{
-  y_ = s.y_;
-}
-
-aeif_cond_beta_multisynapse::State_& aeif_cond_beta_multisynapse::State_::operator=( const State_& s )
-{
-  assert( this != &s ); // would be bad logical error in program
-
-  y_ = s.y_;
-  r_ = s.r_;
-  return *this;
 }
 
 /* ----------------------------------------------------------------
@@ -234,22 +219,23 @@ aeif_cond_beta_multisynapse::Parameters_::set( const DictionaryDatum& d, Node* n
   bool Erev_flag = updateValue< std::vector< double > >( d, names::E_rev, E_rev );
   bool taur_flag = updateValue< std::vector< double > >( d, names::tau_rise, tau_rise );
   bool taud_flag = updateValue< std::vector< double > >( d, names::tau_decay, tau_decay );
-  if ( Erev_flag || taur_flag || taud_flag )
+  if ( Erev_flag or taur_flag or taud_flag )
   { // receptor arrays have been modified
-    if ( ( E_rev.size() != old_n_receptors || tau_rise.size() != old_n_receptors
-           || tau_decay.size() != old_n_receptors ) && ( not Erev_flag || not taur_flag || not taud_flag ) )
+    if ( ( E_rev.size() != old_n_receptors or tau_rise.size() != old_n_receptors
+           or tau_decay.size() != old_n_receptors )
+      and ( not Erev_flag or not taur_flag or not taud_flag ) )
     {
       throw BadProperty(
         "If the number of receptor ports is changed, all three arrays "
         "E_rev, tau_rise and tau_decay must be provided." );
     }
-    if ( ( E_rev.size() != tau_rise.size() ) || ( E_rev.size() != tau_decay.size() ) )
+    if ( ( E_rev.size() != tau_rise.size() ) or ( E_rev.size() != tau_decay.size() ) )
     {
       throw BadProperty(
         "The reversal potential, synaptic rise time and synaptic decay time "
         "arrays must have the same size." );
     }
-    if ( tau_rise.size() < old_n_receptors && has_connections_ )
+    if ( tau_rise.size() < old_n_receptors and has_connections_ )
     {
       throw BadProperty(
         "The neuron has connections, therefore the number of ports cannot be "
@@ -257,7 +243,7 @@ aeif_cond_beta_multisynapse::Parameters_::set( const DictionaryDatum& d, Node* n
     }
     for ( size_t i = 0; i < tau_rise.size(); ++i )
     {
-      if ( tau_rise[ i ] <= 0 || tau_decay[ i ] <= 0 )
+      if ( tau_rise[ i ] <= 0 or tau_decay[ i ] <= 0 )
       {
         throw BadProperty( "All synaptic time constants must be strictly positive" );
       }
@@ -358,9 +344,9 @@ aeif_cond_beta_multisynapse::State_::set( const DictionaryDatum& d, Node* node )
 
 aeif_cond_beta_multisynapse::Buffers_::Buffers_( aeif_cond_beta_multisynapse& n )
   : logger_( n )
-  , s_( 0 )
-  , c_( 0 )
-  , e_( 0 )
+  , s_( nullptr )
+  , c_( nullptr )
+  , e_( nullptr )
   , step_( Time::get_resolution().get_ms() )
   , IntegrationStep_( std::min( 0.01, step_ ) )
   , I_stim_( 0.0 )
@@ -369,9 +355,9 @@ aeif_cond_beta_multisynapse::Buffers_::Buffers_( aeif_cond_beta_multisynapse& n 
 
 aeif_cond_beta_multisynapse::Buffers_::Buffers_( const Buffers_& b, aeif_cond_beta_multisynapse& n )
   : logger_( n )
-  , s_( 0 )
-  , c_( 0 )
-  , e_( 0 )
+  , s_( nullptr )
+  , c_( nullptr )
+  , e_( nullptr )
   , step_( b.step_ )
   , IntegrationStep_( b.IntegrationStep_ )
   , I_stim_( b.I_stim_ )
@@ -383,7 +369,7 @@ aeif_cond_beta_multisynapse::Buffers_::Buffers_( const Buffers_& b, aeif_cond_be
  * ---------------------------------------------------------------- */
 
 aeif_cond_beta_multisynapse::aeif_cond_beta_multisynapse()
-  : Archiving_Node()
+  : ArchivingNode()
   , P_()
   , S_( P_ )
   , B_( *this )
@@ -392,7 +378,7 @@ aeif_cond_beta_multisynapse::aeif_cond_beta_multisynapse()
 }
 
 aeif_cond_beta_multisynapse::aeif_cond_beta_multisynapse( const aeif_cond_beta_multisynapse& n )
-  : Archiving_Node( n )
+  : ArchivingNode( n )
   , P_( n.P_ )
   , S_( n.S_ )
   , B_( n.B_, *this )
@@ -422,18 +408,11 @@ aeif_cond_beta_multisynapse::~aeif_cond_beta_multisynapse()
  * ---------------------------------------------------------------- */
 
 void
-aeif_cond_beta_multisynapse::init_state_( const Node& proto )
-{
-  const aeif_cond_beta_multisynapse& pr = downcast< aeif_cond_beta_multisynapse >( proto );
-  S_ = pr.S_;
-}
-
-void
 aeif_cond_beta_multisynapse::init_buffers_()
 {
   B_.spikes_.clear();   // includes resize
   B_.currents_.clear(); // includes resize
-  Archiving_Node::clear_history();
+  ArchivingNode::clear_history();
 
   B_.logger_.reset();
 
@@ -442,7 +421,7 @@ aeif_cond_beta_multisynapse::init_buffers_()
   // We must integrate this model with high-precision to obtain decent results
   B_.IntegrationStep_ = std::min( 0.01, B_.step_ );
 
-  if ( B_.c_ == 0 )
+  if ( not B_.c_ )
   {
     B_.c_ = gsl_odeiv_control_yp_new( P_.gsl_error_tol, P_.gsl_error_tol );
   }
@@ -451,17 +430,17 @@ aeif_cond_beta_multisynapse::init_buffers_()
     gsl_odeiv_control_init( B_.c_, P_.gsl_error_tol, P_.gsl_error_tol, 0.0, 1.0 );
   }
 
-  // Stepping function and evolution function are allocated in calibrate()
+  // Stepping function and evolution function are allocated in pre_run_hook()
 
   B_.sys_.function = aeif_cond_beta_multisynapse_dynamics;
-  B_.sys_.jacobian = NULL;
+  B_.sys_.jacobian = nullptr;
   B_.sys_.params = reinterpret_cast< void* >( this );
-  // B_.sys_.dimension is assigned in calibrate()
+  // B_.sys_.dimension is assigned in pre_run_hook()
   B_.I_stim_ = 0.0;
 }
 
 void
-aeif_cond_beta_multisynapse::calibrate()
+aeif_cond_beta_multisynapse::pre_run_hook()
 {
   // ensures initialization in case mm connected after Simulate
   B_.logger_.init();
@@ -471,34 +450,8 @@ aeif_cond_beta_multisynapse::calibrate()
 
   for ( size_t i = 0; i < P_.n_receptors(); ++i )
   {
-    // the denominator (denom1) that appears in the expression of the peak time
-    // is computed here to check that it is != 0
-    // another denominator denom2 appears in the expression of the
-    // normalization factor g0
-    // Both denom1 and denom2 are null if tau_decay = tau_rise, but they
-    // can also be null if tau_decay and tau_rise are not equal but very
-    // close to each other, due to the numerical precision limits.
-    // In such case the beta function reduces to the alpha function,
-    // and the normalization factor for the alpha function should be used.
-    double denom1 = P_.tau_decay[ i ] - P_.tau_rise[ i ];
-    double denom2 = 0;
-    if ( denom1 != 0 )
-    {
-      // peak time
-      const double t_p =
-        P_.tau_decay[ i ] * P_.tau_rise[ i ] * std::log( P_.tau_decay[ i ] / P_.tau_rise[ i ] ) / denom1;
-      // another denominator is computed here to check that it is != 0
-      denom2 = std::exp( -t_p / P_.tau_decay[ i ] ) - std::exp( -t_p / P_.tau_rise[ i ] );
-    }
-    if ( denom2 == 0 ) // if rise time == decay time use alpha function
-    {                  // use normalization for alpha function in this case
-      V_.g0_[ i ] = 1.0 * numerics::e / P_.tau_decay[ i ];
-    }
-    else // if rise time != decay time use beta function
-    {
-      V_.g0_[ i ] // normalization factor for conductance
-        = ( 1. / P_.tau_rise[ i ] - 1. / P_.tau_decay[ i ] ) / denom2;
-    }
+    // normalization factor for conductance
+    V_.g0_[ i ] = beta_normalization_factor( P_.tau_rise[ i ], P_.tau_decay[ i ] );
   }
 
   // set the right threshold depending on Delta_T
@@ -512,21 +465,20 @@ aeif_cond_beta_multisynapse::calibrate()
   }
 
   V_.refractory_counts_ = Time( Time::ms( P_.t_ref_ ) ).get_steps();
-  assert( V_.refractory_counts_ >= 0 ); // since t_ref_ >= 0, this can only fail in error
 
   B_.spikes_.resize( P_.n_receptors() );
   S_.y_.resize(
     State_::NUMBER_OF_FIXED_STATES_ELEMENTS + ( State_::NUM_STATE_ELEMENTS_PER_RECEPTOR * P_.n_receptors() ), 0.0 );
 
   // reallocate instance of stepping function for ODE GSL solver
-  if ( B_.s_ != 0 )
+  if ( B_.s_ )
   {
     gsl_odeiv_step_free( B_.s_ );
   }
   B_.s_ = gsl_odeiv_step_alloc( gsl_odeiv_step_rkf45, S_.y_.size() );
 
   // reallocate instance of evolution function for ODE GSL solver
-  if ( B_.e_ != 0 )
+  if ( B_.e_ )
   {
     gsl_odeiv_evolve_free( B_.e_ );
   }
@@ -541,8 +493,6 @@ aeif_cond_beta_multisynapse::calibrate()
 void
 aeif_cond_beta_multisynapse::update( Time const& origin, const long from, const long to )
 {
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
   assert( State_::V_M == 0 );
 
   for ( long lag = from; lag < to; ++lag ) // proceed by stepsize B_.step_
@@ -579,7 +529,7 @@ aeif_cond_beta_multisynapse::update( Time const& origin, const long from, const 
       }
 
       // check for unreasonable values; we allow V_M to explode
-      if ( S_.y_[ State_::V_M ] < -1e3 || S_.y_[ State_::W ] < -1e6 || S_.y_[ State_::W ] > 1e6 )
+      if ( S_.y_[ State_::V_M ] < -1e3 or S_.y_[ State_::W ] < -1e6 or S_.y_[ State_::W ] > 1e6 )
       {
         throw NumericalInstability( get_name() );
       }
@@ -629,7 +579,7 @@ aeif_cond_beta_multisynapse::update( Time const& origin, const long from, const 
 port
 aeif_cond_beta_multisynapse::handles_test_event( SpikeEvent&, rport receptor_type )
 {
-  if ( receptor_type <= 0 || receptor_type > static_cast< port >( P_.n_receptors() ) )
+  if ( receptor_type <= 0 or receptor_type > static_cast< port >( P_.n_receptors() ) )
   {
     throw IncompatibleReceptorType( receptor_type, get_name(), "SpikeEvent" );
   }
@@ -647,7 +597,7 @@ aeif_cond_beta_multisynapse::handle( SpikeEvent& e )
       "must be positive." );
   }
   assert( e.get_delay_steps() > 0 );
-  assert( ( e.get_rport() > 0 ) && ( ( size_t ) e.get_rport() <= P_.n_receptors() ) );
+  assert( ( e.get_rport() > 0 ) and ( ( size_t ) e.get_rport() <= P_.n_receptors() ) );
 
   B_.spikes_[ e.get_rport() - 1 ].add_value(
     e.get_rel_delivery_steps( kernel().simulation_manager.get_slice_origin() ), e.get_weight() * e.get_multiplicity() );
@@ -683,7 +633,7 @@ aeif_cond_beta_multisynapse::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   /*
    * Here is where we must update the recordablesMap_ if new receptors

@@ -33,52 +33,49 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup parrot
+/* BeginUserDocs: neuron, parrot
 
-Name: parrot_neuron - Neuron that repeats incoming spikes.
+Short description
++++++++++++++++++
 
-Description:
+Neuron that repeats incoming spikes
+
+Description
++++++++++++
 
 The parrot neuron simply emits one spike for every incoming spike.
 An important application is to provide identical poisson spike
-trains to a group of neurons. The poisson_generator sends a different
+trains to a group of neurons. The ``poisson_generator`` sends a different
 spike train to each of its target neurons. By connecting one
-poisson_generator to a parrot_neuron and then that parrot_neuron to
+``poisson_generator`` to a ``parrot_neuron`` and then that ``parrot_neuron`` to
 a group of neurons, all target neurons will receive the same poisson
 spike train.
 
-Remarks:
-
-- Weights on connection to the parrot_neuron are ignored.
-- Weights on connections from the parrot_neuron are handled as usual.
-- Delays are honored on incoming and outgoing connections.
-- Multiplicity may be used to indicate number of spikes in a single
-  time step. Instead of the accumulated weigths of the incoming spikes, the
-  number of the spikes is stored within a ring buffer.
+Please note that weights of connections *to* the ``parrot_neuron``
+are ignored, while weights on connections *from* the ``parrot_neuron``
+to the target are handled as usual. Delays are honored on both
+incoming and outgoing connections.
 
 Only spikes arriving on connections to port 0 will be repeated.
 Connections onto port 1 will be accepted, but spikes incoming
 through port 1 will be ignored. This allows setting exact pre-
-and post-synaptic spike times for STDP protocols by connecting
-two parrot neurons spiking at desired times by, e.g., a
-stdp_synapse onto port 1 on the post-synaptic parrot neuron.
+and postsynaptic spike times for STDP protocols by connecting
+two parrot neurons spiking at desired times by, for example, a
+``stdp_synapse`` onto port 1 on the postsynaptic parrot neuron.
 
-Receives: SpikeEvent
+Receives
+++++++++
 
-Sends: SpikeEvent
+SpikeEvent
 
-Parameters:
+Sends
++++++
 
-No parameters to be set in the status dictionary.
+SpikeEvent
 
-Author: David Reichert, Abigail Morrison, Alexander Seeholzer, Hans Ekkehard
-Plesser
+EndUserDocs */
 
-FirstVersion: May 2006
-*/
-class parrot_neuron : public Archiving_Node
+class parrot_neuron : public ArchivingNode
 {
 
 public:
@@ -91,31 +88,27 @@ public:
    */
   using Node::handle;
   using Node::handles_test_event;
-  using Node::sends_signal;
   using Node::receives_signal;
+  using Node::sends_signal;
 
-  port send_test_event( Node&, rport, synindex, bool );
-  SignalType sends_signal() const;
-  SignalType receives_signal() const;
+  port send_test_event( Node&, rport, synindex, bool ) override;
+  SignalType sends_signal() const override;
+  SignalType receives_signal() const override;
 
-  void handle( SpikeEvent& );
-  port handles_test_event( SpikeEvent&, rport );
+  void handle( SpikeEvent& ) override;
+  port handles_test_event( SpikeEvent&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
+  void init_buffers_() override;
   void
-  init_state_( const Node& )
-  {
-  } // no state
-  void init_buffers_();
-  void
-  calibrate()
+  pre_run_hook() override
   {
   } // no variables
 
-  void update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
 
   /**
      Buffers and accumulates the number of incoming spikes per time step;

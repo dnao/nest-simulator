@@ -80,18 +80,22 @@ print_nodes_to_stream( std::ostream& ostr )
   kernel().node_manager.print( ostr );
 }
 
-librandom::RngPtr
-get_vp_rng( thread tid )
+RngPtr
+get_rank_synced_rng()
 {
-  assert( tid >= 0 );
-  assert( tid < static_cast< thread >( kernel().vp_manager.get_num_threads() ) );
-  return kernel().rng_manager.get_rng( tid );
+  return kernel().random_manager.get_rank_synced_rng();
 }
 
-librandom::RngPtr
-get_global_rng()
+RngPtr
+get_vp_synced_rng( thread tid )
 {
-  return kernel().rng_manager.get_grng();
+  return kernel().random_manager.get_vp_synced_rng( tid );
+}
+
+RngPtr
+get_vp_specific_rng( thread tid )
+{
+  return kernel().random_manager.get_vp_specific_rng( tid );
 }
 
 void
@@ -164,15 +168,7 @@ create( const Name& model_name, const index n_nodes )
     throw RangeCheck();
   }
 
-  const Token model = kernel().model_manager.get_modeldict()->lookup( model_name );
-  if ( model.empty() )
-  {
-    throw UnknownModelName( model_name );
-  }
-
-  // create
-  const index model_id = static_cast< index >( model );
-
+  const index model_id = kernel().model_manager.get_node_model_id( model_name );
   return kernel().node_manager.add_node( model_id, n_nodes );
 }
 
@@ -186,9 +182,22 @@ void
 connect( NodeCollectionPTR sources,
   NodeCollectionPTR targets,
   const DictionaryDatum& connectivity,
-  const DictionaryDatum& synapse_params )
+  const std::vector< DictionaryDatum >& synapse_params )
 {
   kernel().connection_manager.connect( sources, targets, connectivity, synapse_params );
+}
+
+void
+connect_arrays( long* sources,
+  long* targets,
+  double* weights,
+  double* delays,
+  std::vector< std::string >& p_keys,
+  double* p_values,
+  size_t n,
+  std::string syn_model )
+{
+  kernel().connection_manager.connect_arrays( sources, targets, weights, delays, p_keys, p_values, n, syn_model );
 }
 
 ArrayDatum
@@ -201,6 +210,18 @@ get_connections( const DictionaryDatum& dict )
   ALL_ENTRIES_ACCESSED( *dict, "GetConnections", "Unread dictionary entries: " );
 
   return array;
+}
+
+void
+disconnect( const ArrayDatum& conns )
+{
+  for ( size_t conn_index = 0; conn_index < conns.size(); ++conn_index )
+  {
+    const auto conn_datum = getValue< ConnectionDatum >( conns.get( conn_index ) );
+    const auto target_node = kernel().node_manager.get_node_or_proxy( conn_datum.get_target_node_id() );
+    kernel().sp_manager.disconnect(
+      conn_datum.get_source_node_id(), target_node, conn_datum.get_target_thread(), conn_datum.get_synapse_model_id() );
+  }
 }
 
 void
@@ -253,126 +274,52 @@ copy_model( const Name& oldmodname, const Name& newmodname, const DictionaryDatu
 }
 
 void
-set_model_defaults( const Name& modelname, const DictionaryDatum& dict )
+set_model_defaults( const std::string component, const DictionaryDatum& dict )
 {
-  kernel().model_manager.set_model_defaults( modelname, dict );
+  if ( kernel().model_manager.set_model_defaults( component, dict ) )
+  {
+    return;
+  }
+
+  if ( kernel().io_manager.is_valid_recording_backend( component ) )
+  {
+    kernel().io_manager.set_recording_backend_status( component, dict );
+    return;
+  }
+
+  throw UnknownComponent( component );
 }
 
 DictionaryDatum
-get_model_defaults( const Name& modelname )
+get_model_defaults( const std::string component )
 {
-  const Token nodemodel = kernel().model_manager.get_modeldict()->lookup( modelname );
-  const Token synmodel = kernel().model_manager.get_synapsedict()->lookup( modelname );
-
-  DictionaryDatum dict;
-
-  if ( not nodemodel.empty() )
+  try
   {
-    const long model_id = static_cast< long >( nodemodel );
-    Model* m = kernel().model_manager.get_model( model_id );
-    dict = m->get_status();
+    const index model_id = kernel().model_manager.get_node_model_id( component );
+    return kernel().model_manager.get_node_model( model_id )->get_status();
   }
-  else if ( not synmodel.empty() )
+  catch ( UnknownModelName& )
   {
-    const long synapse_id = static_cast< long >( synmodel );
-    dict = kernel().model_manager.get_connector_defaults( synapse_id );
-  }
-  else
-  {
-    throw UnknownModelName( modelname.toString() );
+    // ignore errors; throw at the end of the function if that's reached
   }
 
-  return dict;
-}
+  try
+  {
+    const index synapse_model_id = kernel().model_manager.get_synapse_model_id( component );
+    return kernel().model_manager.get_connector_defaults( synapse_model_id );
+  }
+  catch ( UnknownSynapseType& )
+  {
+    // ignore errors; throw at the end of the function if that's reached
+  }
 
-ParameterDatum
-multiply_parameter( const ParameterDatum& param1, const ParameterDatum& param2 )
-{
-  return param1->multiply_parameter( *param2 );
-}
+  if ( kernel().io_manager.is_valid_recording_backend( component ) )
+  {
+    return kernel().io_manager.get_recording_backend_status( component );
+  }
 
-ParameterDatum
-divide_parameter( const ParameterDatum& param1, const ParameterDatum& param2 )
-{
-  return param1->divide_parameter( *param2 );
-}
-
-ParameterDatum
-add_parameter( const ParameterDatum& param1, const ParameterDatum& param2 )
-{
-  return param1->add_parameter( *param2 );
-}
-
-ParameterDatum
-subtract_parameter( const ParameterDatum& param1, const ParameterDatum& param2 )
-{
-  return param1->subtract_parameter( *param2 );
-}
-
-ParameterDatum
-compare_parameter( const ParameterDatum& param1, const ParameterDatum& param2, const DictionaryDatum& d )
-{
-  return param1->compare_parameter( *param2, d );
-}
-
-ParameterDatum
-conditional_parameter( const ParameterDatum& param1, const ParameterDatum& param2, const ParameterDatum& param3 )
-{
-  return param1->conditional_parameter( *param2, *param3 );
-}
-
-ParameterDatum
-min_parameter( const ParameterDatum& param, const double other_value )
-{
-  return param->min( other_value );
-}
-
-ParameterDatum
-max_parameter( const ParameterDatum& param, const double other_value )
-{
-  return param->max( other_value );
-}
-
-ParameterDatum
-redraw_parameter( const ParameterDatum& param, const double min, const double max )
-{
-  return param->redraw( min, max );
-}
-
-ParameterDatum
-exp_parameter( const ParameterDatum& param )
-{
-  return param->exp();
-}
-
-ParameterDatum
-sin_parameter( const ParameterDatum& param )
-{
-  return param->sin();
-}
-
-ParameterDatum
-cos_parameter( const ParameterDatum& param )
-{
-  return param->cos();
-}
-
-ParameterDatum
-pow_parameter( const ParameterDatum& param, const double exponent )
-{
-  return param->pow( exponent );
-}
-
-ParameterDatum
-dimension_parameter( const ParameterDatum& param_x, const ParameterDatum& param_y )
-{
-  return param_x->dimension_parameter( *param_y );
-}
-
-ParameterDatum
-dimension_parameter( const ParameterDatum& param_x, const ParameterDatum& param_y, const ParameterDatum& param_z )
-{
-  return param_x->dimension_parameter( *param_y, *param_z );
+  throw UnknownComponent( component );
+  return DictionaryDatum(); // supress missing return value warning; never reached
 }
 
 ParameterDatum
@@ -390,7 +337,7 @@ create_parameter( const DictionaryDatum& param_dict )
 double
 get_value( const ParameterDatum& param )
 {
-  librandom::RngPtr rng = get_global_rng();
+  RngPtr rng = get_rank_synced_rng();
   return param->value( rng, nullptr );
 }
 
@@ -405,7 +352,7 @@ apply( const ParameterDatum& param, const NodeCollectionDatum& nc )
 {
   std::vector< double > result;
   result.reserve( nc->size() );
-  librandom::RngPtr rng = get_global_rng();
+  RngPtr rng = get_rank_synced_rng();
   for ( auto it = nc->begin(); it < nc->end(); ++it )
   {
     auto node = kernel().node_manager.get_node_or_proxy( ( *it ).node_id );
@@ -424,5 +371,66 @@ apply( const ParameterDatum& param, const DictionaryDatum& positions )
   TokenArray target_tkns = getValue< TokenArray >( targets_tkn );
   return param->apply( source_nc, target_tkns );
 }
+
+Datum*
+node_collection_array_index( const Datum* datum, const long* array, unsigned long n )
+{
+  const NodeCollectionDatum node_collection = *dynamic_cast< const NodeCollectionDatum* >( datum );
+  assert( node_collection->size() >= n );
+  std::vector< index > node_ids;
+  node_ids.reserve( n );
+
+  for ( auto node_ptr = array; node_ptr != array + n; ++node_ptr )
+  {
+    node_ids.push_back( node_collection->operator[]( *node_ptr ) );
+  }
+  return new NodeCollectionDatum( NodeCollection::create( node_ids ) );
+}
+
+Datum*
+node_collection_array_index( const Datum* datum, const bool* array, unsigned long n )
+{
+  const NodeCollectionDatum node_collection = *dynamic_cast< const NodeCollectionDatum* >( datum );
+  assert( node_collection->size() == n );
+  std::vector< index > node_ids;
+  node_ids.reserve( n );
+
+  auto nc_it = node_collection->begin();
+  for ( auto node_ptr = array; node_ptr != array + n; ++node_ptr, ++nc_it )
+  {
+    if ( *node_ptr )
+    {
+      node_ids.push_back( ( *nc_it ).node_id );
+    }
+  }
+  return new NodeCollectionDatum( NodeCollection::create( node_ids ) );
+}
+
+void
+slice_positions_if_sliced_nc( DictionaryDatum& dict, const NodeCollectionDatum& nc )
+{
+  // If metadata contains node positions and the NodeCollection is sliced, get only positions of the sliced nodes.
+  if ( dict->known( names::positions ) )
+  {
+    const auto positions = getValue< TokenArray >( dict, names::positions );
+    if ( nc->size() != positions.size() )
+    {
+      TokenArray sliced_points;
+      // Iterate only local nodes
+      NodeCollection::const_iterator nc_begin = nc->has_proxies() ? nc->MPI_local_begin() : nc->begin();
+      NodeCollection::const_iterator nc_end = nc->end();
+      for ( auto node = nc_begin; node < nc_end; ++node )
+      {
+        // Because the local ID also includes non-local nodes, it must be adapted to represent
+        // the index for the local node position.
+        const auto index =
+          static_cast< size_t >( std::floor( ( *node ).lid / kernel().mpi_manager.get_num_processes() ) );
+        sliced_points.push_back( positions[ index ] );
+      }
+      def2< TokenArray, ArrayDatum >( dict, names::positions, sliced_points );
+    }
+  }
+}
+
 
 } // namespace nest

@@ -19,8 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with NEST.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Gap Junctions: Inhibitory network example
------------------------------------------------
+"""
+Gap Junctions: Inhibitory network example
+-----------------------------------------
 
 This script simulates an inhibitory network of 500 Hodgkin-Huxley neurons.
 Without the gap junctions (meaning for ``gap_weight = 0.0``) the network shows
@@ -37,7 +38,7 @@ This example is also used as test case 2 (see Figure 9 and 10)
 in [1]_.
 
 References
-~~~~~~~~~~~
+~~~~~~~~~~
 
 .. [1] Hahne et al. (2015) A unified framework for spiking and gap-junction
        interactions in distributed neuronal network simulations, Front.
@@ -63,25 +64,26 @@ nest.ResetKernel()
 
 ###############################################################################
 # First we set the random seed, adjust the kernel settings and create
-# ``hh_psc_alpha_gap`` neurons, ``spike_detector`` and ``poisson_generator``.
+# ``hh_psc_alpha_gap`` neurons, ``spike_recorder`` and ``poisson_generator``.
 
 numpy.random.seed(1)
 
-nest.SetKernelStatus({'resolution': 0.05,
-                      'total_num_virtual_procs': threads,
-                      'print_time': True,
-                      # Settings for waveform relaxation
-                      # 'use_wfr': False uses communication in every step
-                      # instead of an iterative solution
-                      'use_wfr': True,
-                      'wfr_comm_interval': 1.0,
-                      'wfr_tol': 0.0001,
-                      'wfr_max_iterations': 15,
-                      'wfr_interpolation_order': 3})
+nest.resolution = 0.05
+nest.total_num_virtual_procs = threads
+nest.print_time = True
+
+# Settings for waveform relaxation. If 'use_wfr' is set to False,
+# communication takes place in every step instead of using an
+# iterative solution
+nest.use_wfr = True
+nest.wfr_comm_interval = 1.0
+nest.wfr_tol = 0.0001
+nest.wfr_max_iterations = 15
+nest.wfr_interpolation_order = 3
 
 neurons = nest.Create('hh_psc_alpha_gap', n_neuron)
 
-sd = nest.Create("spike_detector")
+sr = nest.Create("spike_recorder")
 pg = nest.Create("poisson_generator", params={'rate': 500.0})
 
 ###############################################################################
@@ -109,10 +111,10 @@ nest.Connect(pg, neurons, 'all_to_all',
                        'delay': delay})
 
 ###############################################################################
-# Then the neurons are connected to the ``spike_detector`` and the initial
+# Then the neurons are connected to the ``spike_recorder`` and the initial
 # membrane potential of each neuron is set randomly between -40 and -80 mV.
 
-nest.Connect(neurons, sd)
+nest.Connect(neurons, sr)
 
 neurons.V_m = nest.random.uniform(min=-80., max=-40.)
 
@@ -142,15 +144,16 @@ for source_node_id, target_node_id in connections:
 
 nest.Simulate(simtime)
 
-times = sd.get('events', 'times')
-spikes = sd.get('events', 'senders')
-n_spikes = sd.n_events
+events = sr.events
+times = events['times']
+spikes = events['senders']
+n_spikes = sr.n_events
 
 hz_rate = (1000.0 * n_spikes / simtime) / n_neuron
 
 plt.figure(1)
 plt.plot(times, spikes, 'o')
-plt.title('Average spike rate (Hz): %.2f' % hz_rate)
+plt.title(f'Average spike rate (Hz): {hz_rate:.2f}')
 plt.xlabel('time (ms)')
 plt.ylabel('neuron no')
 plt.show()

@@ -201,6 +201,11 @@ public:
     ConnectorModel& cm,
     const DictionaryDatum& dict,
     const index lcid );
+
+  /**
+   * Checks if the device has any connections in this thread
+   */
+  bool is_device_connected( thread tid, index lcid ) const;
 };
 
 inline void
@@ -234,12 +239,31 @@ TargetTableDevices::send_from_device( const thread tid,
         it != target_from_devices_[ tid ][ ldid ].end();
         ++it )
   {
-    if ( *it != NULL )
+    if ( *it )
     {
       ( *it )->send_to_all( tid, cm, e );
     }
   }
 }
+
+inline bool
+TargetTableDevices::is_device_connected( const thread tid, const index lcid ) const
+{
+  for ( auto& synapse : target_from_devices_[ tid ][ lcid ] )
+  {
+    if ( synapse )
+    {
+      std::deque< ConnectionID > conns;
+      synapse->get_all_connections( lcid, 0, tid, UNLABELED_CONNECTION, conns );
+      if ( not conns.empty() )
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 
 } // namespace nest
 

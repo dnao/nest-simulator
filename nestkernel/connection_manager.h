@@ -28,17 +28,19 @@
 
 // Includes from libnestutil:
 #include "manager_interface.h"
+#include "stopwatch.h"
 
 // Includes from nestkernel:
 #include "conn_builder.h"
 #include "connection_id.h"
 #include "connector_base.h"
-#include "node_collection.h"
 #include "nest_time.h"
 #include "nest_timeconverter.h"
 #include "nest_types.h"
+#include "node_collection.h"
 #include "per_thread_bool_indicator.h"
 #include "source_table.h"
+#include "spike_data.h"
 #include "target_table.h"
 #include "target_table_devices.h"
 
@@ -74,18 +76,20 @@ public:
   };
 
   ConnectionManager();
-  virtual ~ConnectionManager();
+  ~ConnectionManager() override;
 
-  virtual void initialize();
-  virtual void finalize();
+  void initialize() override;
+  void finalize() override;
+  void change_number_of_threads() override;
+  void set_status( const DictionaryDatum& ) override;
+  void get_status( DictionaryDatum& ) override;
 
-  virtual void set_status( const DictionaryDatum& );
-  virtual void get_status( DictionaryDatum& );
-
-  DictionaryDatum& get_connruledict();
+  bool valid_connection_rule( std::string );
 
   void compute_target_data_buffer_size();
   void compute_compressed_secondary_recv_buffer_positions( const thread tid );
+  void collect_compressed_spike_data( const thread tid );
+  void clear_compressed_spike_data_map( const thread tid );
 
   /**
    * Add a connectivity rule, i.e. the respective ConnBuilderFactory.
@@ -97,12 +101,12 @@ public:
     NodeCollectionPTR sources,
     NodeCollectionPTR targets,
     const DictionaryDatum& conn_spec,
-    const DictionaryDatum& syn_spec );
+    const std::vector< DictionaryDatum >& syn_specs );
 
   /**
    * Create connections.
    */
-  void connect( NodeCollectionPTR, NodeCollectionPTR, const DictionaryDatum&, const DictionaryDatum& );
+  void connect( NodeCollectionPTR, NodeCollectionPTR, const DictionaryDatum&, const std::vector< DictionaryDatum >& );
 
   void connect( TokenArray, TokenArray, const DictionaryDatum& );
 
@@ -130,8 +134,8 @@ public:
     thread target_thread,
     const synindex syn_id,
     const DictionaryDatum& params,
-    const double_t delay = numerics::nan,
-    const double_t weight = numerics::nan );
+    const double delay = numerics::nan,
+    const double weight = numerics::nan );
 
   /**
    * Connect two nodes. The source and target nodes are defined by their
@@ -144,6 +148,15 @@ public:
    * \param syn_id The synapse model to use.
    */
   bool connect( const index snode_id, const index target, const DictionaryDatum& params, const synindex syn_id );
+
+  void connect_arrays( long* sources,
+    long* targets,
+    double* weights,
+    double* delays,
+    std::vector< std::string >& p_keys,
+    double* p_values,
+    size_t n,
+    std::string syn_model );
 
   index find_connection( const thread tid, const synindex syn_id, const index snode_id, const index tnode_id );
 
@@ -187,7 +200,7 @@ public:
    * The function then iterates all entries in source and collects the
    * connection IDs to all neurons in target.
    */
-  ArrayDatum get_connections( const DictionaryDatum& params ) const;
+  ArrayDatum get_connections( const DictionaryDatum& params );
 
   void get_connections( std::deque< ConnectionID >& connectome,
     NodeCollectionPTR source,
@@ -217,6 +230,7 @@ public:
 
   index get_target_node_id( const thread tid, const synindex syn_id, const index lcid ) const;
 
+  bool get_device_connected( thread tid, index lcid ) const;
   /**
    * Triggered by volume transmitter in update.
    * Triggeres updates for all connectors of dopamine synapses that
@@ -314,6 +328,8 @@ public:
    */
   bool get_sort_connections_by_source() const;
 
+  bool use_compressed_spikes() const;
+
   /**
    * Sorts connections in the presynaptic infrastructure by increasing
    * source node ID.
@@ -329,19 +345,19 @@ public:
    * Returns true if connection information needs to be
    * communicated. False otherwise.
    */
-  bool have_connections_changed() const;
+  bool connections_have_changed() const;
 
   /**
    * Sets flag indicating whether connection information needs to be
    * communicated to true.
    */
-  void set_have_connections_changed( const thread tid );
+  void set_connections_have_changed();
 
   /**
    * Sets flag indicating whether connection information needs to be
    * communicated to false.
    */
-  void unset_have_connections_changed( const thread tid );
+  void unset_connections_have_changed();
 
   /**
    * Deletes TargetTable and resets processed flags of
@@ -386,6 +402,12 @@ public:
   double get_stdp_eps() const;
 
   void set_stdp_eps( const double stdp_eps );
+
+  // public stop watch for benchmarking purposes
+  // start and stop in high-level connect functions in nestmodule.cpp and nest.cpp
+  Stopwatch sw_construction_connect;
+
+  const std::vector< SpikeData >& get_compressed_spike_data( const synindex syn_id, const index idx );
 
 private:
   size_t get_num_target_data( const thread tid ) const;
@@ -531,6 +553,13 @@ private:
   SourceTable source_table_;
 
   /**
+   * A structure to hold "unpacked" spikes on the postsynaptic side if
+   * spike compression is enabled. Internally arranged in a 3d
+   * structure: synapses|sources|spike data
+   */
+  std::vector< std::vector< std::vector< SpikeData > > > compressed_spike_data_;
+
+  /**
    * Stores absolute position in receive buffer of secondary events.
    * structure: threads|synapses|position
    */
@@ -555,17 +584,6 @@ private:
    */
   std::vector< std::vector< size_t > > num_connections_;
 
-  /**
-   * @BeginDocumentation
-   * Name: connruledict - dictionary containing all connectivity rules
-   *
-   * Description:
-   * This dictionary provides the connection rules that can be used
-   * in Connect.
-   * 'connruledict info' shows the contents of the dictionary.
-   *
-   * SeeAlso: Connect
-   */
   DictionaryDatum connruledict_; //!< Dictionary for connection rules.
 
   //! ConnBuilder factories, indexed by connruledict_ elements.
@@ -580,10 +598,21 @@ private:
 
   //! True if new connections have been created since startup or last call to
   //! simulate.
-  PerThreadBoolIndicator have_connections_changed_;
+  bool connections_have_changed_;
+
+  //! true if GetConnections has been called.
+  bool get_connections_has_been_called_;
 
   //! Whether to sort connections by source node ID.
   bool sort_connections_by_source_;
+
+  //! Whether to use spike compression; if a neuron has targets on
+  //! multiple threads of a process, this switch makes sure that only
+  //! a single packet is sent to the process instead of one packet per
+  //! target thread; requires sort_connections_by_source_ = true; for
+  //! more details see the discussion and sketch in
+  //! https://github.com/nest/nest-simulator/pull/1338
+  bool use_compressed_spikes_;
 
   //! Whether primary connections (spikes) exist.
   bool has_primary_connections_;
@@ -602,10 +631,10 @@ private:
   double stdp_eps_;
 };
 
-inline DictionaryDatum&
-ConnectionManager::get_connruledict()
+inline bool
+ConnectionManager::valid_connection_rule( std::string rule_name )
 {
-  return connruledict_;
+  return connruledict_->known( rule_name );
 }
 
 inline delay
@@ -705,9 +734,9 @@ ConnectionManager::get_remote_targets_of_local_node( const thread tid, const ind
 }
 
 inline bool
-ConnectionManager::have_connections_changed() const
+ConnectionManager::connections_have_changed() const
 {
-  return have_connections_changed_.any_true();
+  return connections_have_changed_;
 }
 
 inline void
@@ -768,6 +797,12 @@ ConnectionManager::get_sort_connections_by_source() const
   return sort_connections_by_source_;
 }
 
+inline bool
+ConnectionManager::use_compressed_spikes() const
+{
+  return use_compressed_spikes_;
+}
+
 inline double
 ConnectionManager::get_stdp_eps() const
 {
@@ -778,6 +813,12 @@ inline index
 ConnectionManager::get_target_node_id( const thread tid, const synindex syn_id, const index lcid ) const
 {
   return connections_[ tid ][ syn_id ]->get_target_node_id( tid, lcid );
+}
+
+inline bool
+ConnectionManager::get_device_connected( const thread tid, const index lcid ) const
+{
+  return target_table_devices_.is_device_connected( tid, lcid );
 }
 
 inline void
@@ -805,6 +846,18 @@ ConnectionManager::set_source_has_more_targets( const thread tid,
   const bool more_targets )
 {
   connections_[ tid ][ syn_id ]->set_source_has_more_targets( lcid, more_targets );
+}
+
+inline const std::vector< SpikeData >&
+ConnectionManager::get_compressed_spike_data( const synindex syn_id, const index idx )
+{
+  return compressed_spike_data_.at( syn_id ).at( idx );
+}
+
+inline void
+ConnectionManager::clear_compressed_spike_data_map( const thread tid )
+{
+  source_table_.clear_compressed_spike_data_map( tid );
 }
 
 } // namespace nest

@@ -30,8 +30,8 @@ sli::pool::pool()
   , instantiations( 0 )
   , total( 0 )
   , capacity( 0 )
-  , chunks( 0 )
-  , head( 0 )
+  , chunks( nullptr )
+  , head( nullptr )
   , initialized_( false )
 {
 }
@@ -44,8 +44,8 @@ sli::pool::pool( const sli::pool& p )
   , instantiations( 0 )
   , total( 0 )
   , capacity( 0 )
-  , chunks( 0 )
-  , head( 0 )
+  , chunks( nullptr )
+  , head( nullptr )
   , initialized_( false )
 {
 }
@@ -59,8 +59,8 @@ sli::pool::pool( size_t n, size_t initial, size_t growth )
   , instantiations( 0 )
   , total( 0 )
   , capacity( 0 )
-  , chunks( 0 )
-  , head( 0 )
+  , chunks( nullptr )
+  , head( nullptr )
   , initialized_( true )
 {
 }
@@ -79,8 +79,8 @@ sli::pool::init( size_t n, size_t initial, size_t growth )
   instantiations = 0;
   total = 0;
   capacity = 0;
-  chunks = 0;
-  head = 0;
+  chunks = nullptr;
+  head = nullptr;
 }
 
 sli::pool::~pool()
@@ -94,7 +94,8 @@ sli::pool::~pool()
   }
 }
 
-sli::pool& sli::pool::operator=( const sli::pool& p )
+sli::pool&
+sli::pool::operator=( const sli::pool& p )
 {
   if ( &p == this )
   {
@@ -107,8 +108,8 @@ sli::pool& sli::pool::operator=( const sli::pool& p )
   el_size = p.el_size;
   instantiations = 0;
   total = 0;
-  chunks = 0;
-  head = 0;
+  chunks = nullptr;
+  head = nullptr;
   initialized_ = false;
 
   return *this;
@@ -128,12 +129,12 @@ sli::pool::grow( size_t nelements )
   {
     reinterpret_cast< link* >( p )->next = reinterpret_cast< link* >( p + el_size );
   }
-  reinterpret_cast< link* >( last )->next = NULL;
+  reinterpret_cast< link* >( last )->next = nullptr;
   head = reinterpret_cast< link* >( start );
 }
 
 void
-sli::pool::grow( void )
+sli::pool::grow()
 {
   grow( block_size );
   block_size *= growth_factor;
@@ -197,17 +198,6 @@ PoorMansAllocator::alloc( size_t obj_size )
   return ptr;
 }
 
-#ifdef IS_K
-/**
- * On K computer threadprivate does not yet work properly for objects,
- * only for PODs.
- * Thus we allocate a C-style array of allocators on K, aligned to 64
- * byte boundaries. Each element (allocator) is padded to 64 bytes, so
- * it fills an entire cache line in order to avoid false sharing by
- * accesses of different threads to their respective allocator copies.
- */
-__attribute__( ( aligned( 64 ) ) ) PaddedPMA poormansallocpool[ MAX_THREAD ];
-#else
 PoorMansAllocator poormansallocpool;
 #ifdef _OPENMP
 /**
@@ -215,6 +205,5 @@ PoorMansAllocator poormansallocpool;
  * to accesses by different threads.
  */
 #pragma omp threadprivate( poormansallocpool )
-#endif
 #endif
 #endif

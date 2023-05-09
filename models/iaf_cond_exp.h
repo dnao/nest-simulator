@@ -56,26 +56,29 @@ namespace nest
  */
 extern "C" int iaf_cond_exp_dynamics( double, const double*, double*, void* );
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingroup cond
+/* BeginUserDocs: neuron, integrate-and-fire, conductance-based
 
-Name: iaf_cond_exp - Simple conductance based leaky integrate-and-fire neuron
-                     model.
+Short description
++++++++++++++++++
 
-Description:
+Simple conductance based leaky integrate-and-fire neuron model
 
-iaf_cond_exp is an implementation of a spiking neuron using IAF dynamics with
-conductance-based synapses. Incoming spike events induce a post-synaptic change
+Description
++++++++++++
+
+``iaf_cond_exp`` is an implementation of a spiking neuron using IAF dynamics with
+conductance-based synapses. Incoming spike events induce a postsynaptic change
 of conductance modelled by an exponential function. The exponential function
-is normalised such that an event of weight 1.0 results in a peak conductance of
+is normalized such that an event of weight 1.0 results in a peak conductance of
 1 nS.
 
-Parameters:
+See also [1]_.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
-\verbatim embed:rst
+
 =========== ======  =======================================================
  V_m        mV      Membrane potential
  E_L        mV      Leak reversal potential
@@ -86,37 +89,46 @@ The following parameters can be set in the status dictionary.
  E_ex       mV      Excitatory reversal potential
  E_in       mV      Inhibitory reversal potential
  g_L        nS      Leak conductance
- tau_syn_ex ms      Rise time of the excitatory synaptic alpha function
- tau_syn_in ms      Rise time of the inhibitory synaptic alpha function
+ tau_syn_ex ms      Exponential decay time constant of excitatory synaptic
+                    conductance kernel
+ tau_syn_in ms      Exponential decay time constant of inhibitory synaptic
+                    conductance kernel
  I_e        pA      Constant input current
 =========== ======  =======================================================
-\endverbatim
 
-Sends: SpikeEvent
+Sends
++++++
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+SpikeEvent
 
-References:
+Receives
+++++++++
 
-\verbatim embed:rst
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+References
+++++++++++
+
 .. [1] Meffin H, Burkitt AN, Grayden DB (2004). An analytical
        model for the large, fluctuating synaptic conductance state typical of
        neocortical neurons in vivo. Journal of Computational Neuroscience,
        16:159-175.
        DOI: https://doi.org/10.1023/B:JCNS.0000014108.03012.81
-\endverbatim
 
-Author: Sven Schrader
+See also
+++++++++
 
-SeeAlso: iaf_psc_delta, iaf_psc_exp, iaf_cond_exp
-*/
-class iaf_cond_exp : public Archiving_Node
+iaf_psc_delta, iaf_psc_exp, iaf_cond_exp
+
+EndUserDocs*/
+
+class iaf_cond_exp : public ArchivingNode
 {
 
 public:
   iaf_cond_exp();
   iaf_cond_exp( const iaf_cond_exp& );
-  ~iaf_cond_exp();
+  ~iaf_cond_exp() override;
 
   /**
    * Import sets of overloaded virtual functions.
@@ -126,24 +138,23 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void init_buffers_() override;
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   // END Boilerplate function declarations ----------------------------
 
@@ -170,14 +181,14 @@ private:
     double E_ex;     //!< Excitatory reversal Potential in mV
     double E_in;     //!< Inhibitory reversal Potential in mV
     double E_L;      //!< Leak reversal Potential (aka resting potential) in mV
-    double tau_synE; //!< Synaptic Time Constant Excitatory Synapse in ms
-    double tau_synI; //!< Synaptic Time Constant for Inhibitory Synapse in ms
+    double tau_synE; //!< Time constant for excitatory synaptic kernel in ms
+    double tau_synI; //!< Time constant for inhibitory synaptic kernel in ms
     double I_e;      //!< Constant Current in pA
 
     Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;             //!< Store current values in dictionary
-    void set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
 public:
@@ -185,8 +196,7 @@ public:
 
   /**
    * State variables of the model.
-   * @note Copy constructor and assignment operator required because
-   *       of C-style array.
+   * @note Copy constructor required because of C-style array.
    */
   struct State_
   {
@@ -205,6 +215,7 @@ public:
 
     State_( const Parameters_& ); //!< Default initialization
     State_( const State_& );
+
     State_& operator=( const State_& );
 
     void get( DictionaryDatum& ) const;
@@ -219,8 +230,8 @@ private:
    */
   struct Buffers_
   {
-    Buffers_( iaf_cond_exp& );                  //!<Sets buffer pointers to 0
-    Buffers_( const Buffers_&, iaf_cond_exp& ); //!<Sets buffer pointers to 0
+    Buffers_( iaf_cond_exp& );                  //!< Sets buffer pointers to 0
+    Buffers_( const Buffers_&, iaf_cond_exp& ); //!< Sets buffer pointers to 0
 
     //! Logger for all analog data
     UniversalDataLogger< iaf_cond_exp > logger_;
@@ -236,7 +247,7 @@ private:
     gsl_odeiv_evolve* e_;  //!< evolution function
     gsl_odeiv_system sys_; //!< struct describing system
 
-    // Since IntergrationStep_ is initialized with step_, and the resolution
+    // Since IntegrationStep_ is initialized with step_, and the resolution
     // cannot change after nodes have been created, it is safe to place both
     // here.
     double step_;            //!< step size in ms
@@ -328,7 +339,7 @@ iaf_cond_exp::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -345,7 +356,7 @@ iaf_cond_exp::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

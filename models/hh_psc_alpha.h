@@ -57,21 +57,22 @@ namespace nest
  */
 extern "C" int hh_psc_alpha_dynamics( double, const double*, double*, void* );
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup hh
-@ingroup psc
+/* BeginUserDocs: neuron, Hodgkin-Huxley, current-based
 
-Name: hh_psc_alpha - Hodgkin-Huxley neuron model.
+Short description
++++++++++++++++++
 
-Description:
+Hodgkin-Huxley neuron model
 
-hh_psc_alpha is an implementation of a spiking neuron using the Hodgkin-Huxley
+Description
++++++++++++
+
+``hh_psc_alpha`` is an implementation of a spiking neuron using the Hodgkin-Huxley
 formalism.
 
-1. Post-synaptic currents
-Incoming spike events induce a post-synaptic change of current modelled
-by an alpha function. The alpha function is normalised such that an event of
+1. Postsynaptic currents
+Incoming spike events induce a postsynaptic change of current modelled
+by an alpha function. The alpha function is normalized such that an event of
 weight 1.0 results in a peak current of 1 pA.
 
 
@@ -80,10 +81,13 @@ Spike detection is done by a combined threshold-and-local-maximum search: if
 there is a local maximum above a certain threshold of the membrane potential,
 it is considered a spike.
 
-Parameters:
+See also [1]_, [2]_, [3]_.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
-\verbatim embed:rst
+
 ========  ======  ============================================================
 V_m       mV      Membrane potential
 E_L       mV      Leak reversal potential
@@ -100,16 +104,17 @@ Inact_h   real    Inactivation variable h
 Act_n     real    Activation variable n
 I_e       pA      External input current
 ========  ======  ============================================================
-\endverbatim
 
-Problems/Todo:
+Problems/Todo
++++++++++++++
 
-better spike detection
-initial wavelet/spike at simulation onset
+- better spike detection
+- initial wavelet/spike at simulation onset
 
-References:
+References
+++++++++++
 
-\verbatim embed:rst
+
 .. [1] Gerstner W, Kistler W (2002). Spiking neuron models: Single neurons,
        populations, plasticity. New York: Cambridge University Press
 .. [2] Dayan P, Abbott LF (2001). Theoretical neuroscience: Computational and
@@ -119,23 +124,31 @@ References:
        membrane current and its application to conduction and excitation in
        nerve. The Journal of Physiology 117.
        DOI: https://doi.org/10.1113/jphysiol.1952.sp004764
-\endverbatim
 
-Sends: SpikeEvent
+Sends
++++++
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+SpikeEvent
 
-Authors: Schrader
+Receives
+++++++++
 
-SeeAlso: hh_cond_exp_traub
-*/
-class hh_psc_alpha : public Archiving_Node
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+See also
+++++++++
+
+hh_cond_exp_traub
+
+EndUserDocs */
+
+class hh_psc_alpha : public ArchivingNode
 {
 
 public:
   hh_psc_alpha();
   hh_psc_alpha( const hh_psc_alpha& );
-  ~hh_psc_alpha();
+  ~hh_psc_alpha() override;
 
   /**
    * Import sets of overloaded virtual functions.
@@ -145,24 +158,23 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void init_buffers_() override;
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   // END Boilerplate function declarations ----------------------------
 
@@ -196,7 +208,7 @@ private:
     Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;             //!< Store current values in dictionary
-    void set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
 public:
@@ -204,8 +216,7 @@ public:
 
   /**
    * State variables of the model.
-   * @note Copy constructor and assignment operator required because
-   *       of C-style array.
+   * @note Copy constructor required because of C-style array.
    */
   struct State_
   {
@@ -235,6 +246,7 @@ public:
 
     State_( const Parameters_& ); //!< Default initialization
     State_( const State_& );
+
     State_& operator=( const State_& );
 
     void get( DictionaryDatum& ) const;
@@ -249,8 +261,8 @@ private:
    */
   struct Buffers_
   {
-    Buffers_( hh_psc_alpha& );                  //!<Sets buffer pointers to 0
-    Buffers_( const Buffers_&, hh_psc_alpha& ); //!<Sets buffer pointers to 0
+    Buffers_( hh_psc_alpha& );                  //!< Sets buffer pointers to 0
+    Buffers_( const Buffers_&, hh_psc_alpha& ); //!< Sets buffer pointers to 0
 
     //! Logger for all analog data
     UniversalDataLogger< hh_psc_alpha > logger_;
@@ -266,7 +278,7 @@ private:
     gsl_odeiv_evolve* e_;  //!< evolution function
     gsl_odeiv_system sys_; //!< struct describing system
 
-    // Since IntergrationStep_ is initialized with step_, and the resolution
+    // Since IntegrationStep_ is initialized with step_, and the resolution
     // cannot change after nodes have been created, it is safe to place both
     // here.
     double step_;            //!< step size in ms
@@ -365,7 +377,7 @@ hh_psc_alpha::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -382,7 +394,7 @@ hh_psc_alpha::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

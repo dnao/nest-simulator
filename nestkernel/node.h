@@ -32,14 +32,14 @@
 #include <vector>
 
 // Includes from nestkernel:
+#include "deprecation_warning.h"
 #include "event.h"
 #include "histentry.h"
 #include "nest_names.h"
 #include "nest_time.h"
 #include "nest_types.h"
 #include "node_collection.h"
-
-#include "deprecation_warning.h"
+#include "secondary_event.h"
 
 // Includes from sli:
 #include "dictdatum.h"
@@ -51,7 +51,7 @@
 namespace nest
 {
 class Model;
-class Archiving_Node;
+class ArchivingNode;
 class TimeConverter;
 
 
@@ -125,7 +125,7 @@ public:
   virtual Node*
   clone() const
   {
-    return 0;
+    return nullptr;
   }
 
   /**
@@ -134,6 +134,11 @@ public:
    * new nodes to the network.
    */
   virtual bool has_proxies() const;
+
+  /**
+   * Returns true if the node supports the Urbanczik-Senn plasticity rule
+   */
+  virtual bool supports_urbanczik_archiving() const;
 
   /**
    * Returns true if the node only receives events from nodes/devices
@@ -233,33 +238,14 @@ public:
   void set_node_uses_wfr( const bool );
 
   /**
-   * Set state variables to the default values for the model.
-   * Dynamic variables are all observable state variables of a node
-   * that change during Node::update().
-   * After calling init_state(), the state variables
-   * should have the same values that they had after the node was
-   * created. In practice, they will be initialized to the values
-   * of the prototype node (model).
-   * @note If the parameters of the model have been changed since the node
-   *       was created, the node will be initialized to the present values
-   *       set in the model.
-   * @note This function is the public interface to the private function
-   *       Node::init_state_(const Node&) that must be implemented by
-   *       derived classes.
+   * Initialize node prior to first simulation after node has been created.
+   *
+   * init() allows the node to configure internal data structures prior to
+   * being simulated. The method has an effect only the first time it is
+   * called on a given node, otherwise it returns immediately. init() calls
+   * virtual functions init_state_() and init_buffers_().
    */
-  void init_state();
-
-  /**
-   * Initialize buffers of a node.
-   * This function initializes the Buffers of a Node, e.g., ring buffers
-   * for incoming events, buffers for logging potentials.
-   * This function is called before Simulate is called for the first time
-   * on a node, but not upon resumption of a simulation.
-   * This is a wrapper function, which calls the overloaded
-   * Node::init_buffers_() worker only if the buffers of the node have not been
-   * initialized yet.
-   */
-  void init_buffers();
+  void init();
 
   /**
    * Re-calculate dependent parameters of the node.
@@ -268,14 +254,14 @@ public:
    * for spike handling or updating the node.
    *
    */
-  virtual void calibrate() = 0;
+  virtual void pre_run_hook() = 0;
 
   /**
    * Re-calculate time-based properties of the node.
    * This function is called after a change in resolution.
    */
   virtual void
-  calibrate_time( const TimeConverter& tc )
+  calibrate_time( const TimeConverter& )
   {
   }
 
@@ -602,7 +588,8 @@ public:
    * Return 0.0 if not overridden
    * @ingroup SP_functions
    */
-  virtual double get_synaptic_elements( Name ) const
+  virtual double
+  get_synaptic_elements( Name ) const
   {
     return 0.0;
   }
@@ -612,7 +599,8 @@ public:
    * Return 0 if not overridden
    * @ingroup SP_functions
    */
-  virtual int get_synaptic_elements_vacant( Name ) const
+  virtual int
+  get_synaptic_elements_vacant( Name ) const
   {
     return 0;
   }
@@ -622,7 +610,8 @@ public:
    * Return 0 if not overridden
    * @ingroup SP_functions
    */
-  virtual int get_synaptic_elements_connected( Name ) const
+  virtual int
+  get_synaptic_elements_connected( Name ) const
   {
     return 0;
   }
@@ -645,14 +634,14 @@ public:
    * @param t double time when the update is being performed
    * @ingroup SP_functions
    */
-  virtual void update_synaptic_elements( double ){};
+  virtual void update_synaptic_elements( double ) {};
 
   /**
    * Is used to reduce the number of synaptic elements in the node through
    * time. This amount is defined by tau_vacant.
    * @ingroup SP_functions
    */
-  virtual void decay_synaptic_elements_vacant(){};
+  virtual void decay_synaptic_elements_vacant() {};
 
   /**
    * Is used to update the number of connected
@@ -662,7 +651,7 @@ public:
    * @param n int number of new connections of the given type
    * @ingroup SP_functions
    */
-  virtual void connect_synaptic_element( Name, int ){};
+  virtual void connect_synaptic_element( Name, int ) {};
 
   /**
    * return the Kminus value at t (in ms).
@@ -680,18 +669,32 @@ public:
   virtual void get_K_values( double t, double& Kminus, double& nearest_neighbor_Kminus, double& Kminus_triplet );
 
   /**
-  * return the spike history for (t1,t2].
-  * @throws UnexpectedEvent
-  */
+   * return the spike history for (t1,t2].
+   * @throws UnexpectedEvent
+   */
   virtual void get_history( double t1,
     double t2,
     std::deque< histentry >::iterator* start,
     std::deque< histentry >::iterator* finish );
 
+  // for Clopath synapse
   virtual void get_LTP_history( double t1,
     double t2,
-    std::deque< histentry_cl >::iterator* start,
-    std::deque< histentry_cl >::iterator* finish );
+    std::deque< histentry_extended >::iterator* start,
+    std::deque< histentry_extended >::iterator* finish );
+  // for Urbanczik synapse
+  virtual void get_urbanczik_history( double t1,
+    double t2,
+    std::deque< histentry_extended >::iterator* start,
+    std::deque< histentry_extended >::iterator* finish,
+    int );
+  // make neuron parameters accessible in Urbanczik synapse
+  virtual double get_C_m( int comp );
+  virtual double get_g_L( int comp );
+  virtual double get_tau_L( int comp );
+  virtual double get_tau_s( int comp );
+  virtual double get_tau_syn_ex( int comp );
+  virtual double get_tau_syn_in( int comp );
 
   /**
    * Modify Event object parameters during event delivery.
@@ -803,19 +806,6 @@ public:
    */
   index get_thread_lid() const;
 
-  //! True if buffers have been initialized.
-  bool
-  buffers_initialized() const
-  {
-    return buffers_initialized_;
-  }
-
-  void
-  set_buffers_initialized( bool initialized )
-  {
-    buffers_initialized_ = initialized;
-  }
-
   /**
    * Sets the local device id.
    * Throws an error if used on a non-device node.
@@ -839,6 +829,9 @@ public:
 private:
   void set_node_id_( index ); //!< Set global node id
 
+  /**
+   * Set the original NodeCollection of this node.
+   */
   void set_nc_( NodeCollectionPTR );
 
   /** Return a new dictionary datum .
@@ -852,23 +845,19 @@ private:
 
 protected:
   /**
-   * Private function to initialize the state of a node to model defaults.
-   * This function, which must be overloaded by all derived classes, provides
-   * the implementation for initializing the state of a node to the model
-   * defaults; the state is the set of observable dynamic variables.
-   * @param Reference to model prototype object.
-   * @see Node::init_state()
-   * @note To provide a reasonable behavior during the transition to the new
-   *       scheme, init_state_() has a default implementation calling
-   *       init_dynamic_state_().
+   * Configure state variables depending on runtime information.
+   *
+   * Overload this method if the node needs to adapt state variables prior to
+   * first simulation to runtime information, e.g., the number of incoming
+   * connections.
    */
-  virtual void init_state_( Node const& );
+  virtual void init_state_();
 
   /**
-   * Private function to initialize the buffers of a node.
-   * This function, which must be overloaded by all derived classes, provides
-   * the implementation for initializing the buffers of a node.
-   * @see Node::init_buffers()
+   * Configure persistent internal data structures.
+   *
+   * Let node configure persistent internal data structures, such as input
+   * buffers or ODE solvers, to runtime information prior to first simulation.
    */
   virtual void init_buffers_();
 
@@ -913,14 +902,13 @@ private:
    */
   int model_id_;
 
-  thread thread_;            //!< thread node is assigned to
-  thread vp_;                //!< virtual process node is assigned to
-  bool frozen_;              //!< node shall not be updated if true
-  bool buffers_initialized_; //!< Buffers have been initialized
-  bool node_uses_wfr_;       //!< node uses waveform relaxation method
-  bool initialized_;         //!< set true once a node is fully initialized
+  thread thread_;      //!< thread node is assigned to
+  thread vp_;          //!< virtual process node is assigned to
+  bool frozen_;        //!< node shall not be updated if true
+  bool initialized_;   //!< state and buffers have been initialized
+  bool node_uses_wfr_; //!< node uses waveform relaxation method
 
-  NodeCollectionPTR nc_ptr_;
+  NodeCollectionPTR nc_ptr_; //!< Original NodeCollection of this node, used to extract node-specific metadata
 };
 
 inline bool
@@ -933,6 +921,12 @@ inline bool
 Node::node_uses_wfr() const
 {
   return node_uses_wfr_;
+}
+
+inline bool
+Node::supports_urbanczik_archiving() const
+{
+  return false;
 }
 
 inline void
@@ -1017,7 +1011,7 @@ Node::set_model_id( int i )
 inline bool
 Node::is_model_prototype() const
 {
-  return vp_ == invalid_thread_;
+  return vp_ == invalid_thread;
 }
 
 inline void

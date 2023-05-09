@@ -29,37 +29,44 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Synapses
-@ingroup inst_rate
+/* BeginUserDocs: synapse, rate, instantaneous
 
-Name: rate_connection_instantaneous - Synapse type for instantaneous rate
-connections.
+Short description
++++++++++++++++++
 
-Description:
+Synapse type for instantaneous rate connections
 
-rate_connection_instantaneous is a connector to create
+Description
++++++++++++
+
+``rate_connection_instantaneous`` is a connector to create
 instantaneous connections between rate model neurons.
 
 The value of the parameter delay is ignored for connections of
 this type. To create rate connections with delay please use
-the synapse type rate_connection_delayed.
+the synapse type ``rate_connection_delayed``.
 
-Transmits: InstantaneousRateConnectionEvent
+See also [1]_.
 
-References:
+Transmits
++++++++++
 
-\verbatim embed:rst
+InstantaneousRateConnectionEvent
+
+References
+++++++++++
+
 .. [1] Hahne J, Dahmen D, Schuecker J, Frommer A, Bolten M, Helias M,
        Diesmann M (2017). Integration of continuous-time dynamics in a
        spiking neural network simulator. Frontiers in Neuroinformatics, 11:34.
        DOI: https://doi.org/10.3389/fninf.2017.00034
-\endverbatim
 
-Author: David Dahmen, Jan Hahne, Jannis Schuecker
+See also
+++++++++
 
-SeeAlso: rate_connection_delayed, rate_neuron_ipn, rate_neuron_opn
-*/
+rate_connection_delayed, rate_neuron_ipn, rate_neuron_opn
+
+EndUserDocs */
 
 /**
  * Class representing a rate connection. A rate connection
@@ -73,7 +80,8 @@ public:
   // this line determines which common properties to use
   typedef CommonSynapseProperties CommonPropertiesType;
   typedef Connection< targetidentifierT > ConnectionBase;
-  typedef InstantaneousRateConnectionEvent EventType;
+
+  static constexpr ConnectionModelProperties properties = ConnectionModelProperties::SUPPORTS_WFR;
 
   /**
    * Default Constructor.
@@ -84,6 +92,8 @@ public:
     , weight_( 1.0 )
   {
   }
+
+  SecondaryEvent* get_secondary_event();
 
   // Explicitly declare all methods inherited from the dependent base
   // ConnectionBase.
@@ -98,7 +108,7 @@ public:
   void
   check_connection( Node& s, Node& t, rport receptor_type, const CommonPropertiesType& )
   {
-    EventType ge;
+    InstantaneousRateConnectionEvent ge;
 
     s.sends_secondary_event( ge );
     ge.set_sender( s );
@@ -143,6 +153,9 @@ private:
 };
 
 template < typename targetidentifierT >
+constexpr ConnectionModelProperties RateConnectionInstantaneous< targetidentifierT >::properties;
+
+template < typename targetidentifierT >
 void
 RateConnectionInstantaneous< targetidentifierT >::get_status( DictionaryDatum& d ) const
 {
@@ -165,6 +178,13 @@ RateConnectionInstantaneous< targetidentifierT >::set_status( const DictionaryDa
 
   ConnectionBase::set_status( d, cm );
   updateValue< double >( d, names::weight, weight_ );
+}
+
+template < typename targetidentifierT >
+SecondaryEvent*
+RateConnectionInstantaneous< targetidentifierT >::get_secondary_event()
+{
+  return new InstantaneousRateConnectionEvent();
 }
 
 } // namespace

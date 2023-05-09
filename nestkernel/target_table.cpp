@@ -21,8 +21,8 @@
  */
 
 // Includes from nestkernel:
-#include "kernel_manager.h"
 #include "target_table.h"
+#include "kernel_manager.h"
 
 // Includes from libnestutil
 #include "vector_util.h"
@@ -63,7 +63,7 @@ nest::TargetTable::prepare( const thread tid )
   for ( size_t lid = 0; lid < num_local_nodes; ++lid )
   {
     // resize to maximal possible synapse-type index
-    secondary_send_buffer_pos_[ tid ][ lid ].resize( kernel().model_manager.get_num_synapse_prototypes() );
+    secondary_send_buffer_pos_[ tid ][ lid ].resize( kernel().model_manager.get_num_connection_models() );
   }
 }
 
@@ -100,7 +100,8 @@ nest::TargetTable::add_target( const thread tid, const thread target_rank, const
   else
   {
     const SecondaryTargetDataFields& secondary_fields = target_data.secondary_data;
-    const size_t send_buffer_pos = secondary_fields.get_send_buffer_pos();
+    const size_t send_buffer_pos = secondary_fields.get_recv_buffer_pos()
+      + kernel().mpi_manager.get_send_displacement_secondary_events_in_int( target_rank );
     const synindex syn_id = secondary_fields.get_syn_id();
 
     assert( syn_id < secondary_send_buffer_pos_[ tid ][ lid ].size() );

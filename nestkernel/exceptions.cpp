@@ -35,12 +35,24 @@ std::string
 nest::UnknownModelName::message() const
 {
   std::ostringstream msg;
-  msg << "/" << n_.toString() + " is not a known model name. "
-    "Please check the modeldict for a list of available models.";
+  msg << "/" << n_.toString() + " is not a known model name.";
 #ifndef HAVE_GSL
-  msg << " A frequent cause for this error is that NEST was compiled "
-         "without the GNU Scientific Library, which is required for "
-         "the conductance-based neuron models.";
+  msg << " A frequent cause for this error is that NEST was compiled"
+         " without the GNU Scientific Library, which is required for"
+         " the conductance-based neuron models.";
+#endif
+  return msg.str();
+}
+
+std::string
+nest::UnknownComponent::message() const
+{
+  std::ostringstream msg;
+  msg << "/" << n_.toString() + " is not a known component.";
+#ifndef HAVE_GSL
+  msg << " A frequent cause for this error is that NEST was compiled"
+         " without the GNU Scientific Library, which is required for"
+         " the conductance-based neuron models.";
 #endif
   return msg.str();
 }
@@ -50,15 +62,6 @@ nest::NewModelNameExists::message() const
 {
   std::ostringstream msg;
   msg << "/" << n_.toString() + " is the name of an existing model and cannot be re-used.";
-  return msg.str();
-}
-
-std::string
-nest::UnknownModelID::message() const
-{
-  std::ostringstream msg;
-
-  msg << id_ << " is an invalid model ID. Probably modeldict is corrupted.";
   return msg.str();
 }
 
@@ -132,9 +135,18 @@ nest::NodeWithProxiesExpected::message() const
 {
   std::ostringstream out;
   out << "Nest expected a node with proxies (eg normal model neuron),"
-         "but the node with id " << id_ << " is not a node without proxies, "
-                                           "e.g., a subnet or device.";
+         "but the node with id "
+      << id_ << " is not a node without proxies, e.g., a device.";
   return out.str();
+}
+
+std::string
+nest::UnknownCompartment::message() const
+{
+  std::ostringstream msg;
+
+  msg << "Compartment " << compartment_idx_ << " " << info_ << ".";
+  return msg.str();
 }
 
 std::string
@@ -160,6 +172,10 @@ nest::UnknownPort::message() const
 {
   std::ostringstream out;
   out << "Port with id " << id_ << " does not exist.";
+  if ( not info_.empty() )
+  {
+    out << " " << info_ << ".";
+  }
   return out.str();
 }
 
@@ -213,7 +229,7 @@ nest::UnexpectedEvent::message() const
     return std::string(
       "Target node cannot handle input event.\n"
       "    A common cause for this is an attempt to connect recording devices incorrectly.\n"
-      "    Note that detectors such as spike detectors must be connected as\n\n"
+      "    Note that recorders such as spike recorders must be connected as\n\n"
       "        nest.Connect(neurons, spike_det)\n\n"
       "    while meters such as voltmeters must be connected as\n\n"
       "        nest.Connect(meter, neurons) " );
@@ -269,20 +285,6 @@ std::string
 nest::DistributionError::message() const
 {
   return std::string();
-}
-
-std::string
-nest::SubnetExpected::message() const
-{
-  return std::string();
-}
-
-std::string
-nest::SimulationError::message() const
-{
-  return std::string(
-    "One or more nodes reported an error. Please check the output preceeding "
-    "this message." );
 }
 
 std::string
@@ -387,6 +389,17 @@ nest::MUSICChannelAlreadyMapped::message() const
 }
 #endif
 
+#ifdef HAVE_MPI
+std::string
+nest::MPIPortsFileUnknown::message() const
+{
+  std::ostringstream msg;
+  msg << "The node with ID " << node_id_ << " requires a label,"
+      << " which specifies the folder with files containing the MPI ports";
+  return msg.str();
+}
+#endif
+
 std::string
 nest::GSLSolverFailure::message() const
 {
@@ -434,6 +447,14 @@ nest::BackendNotPrepared::message() const
 }
 
 std::string
+nest::BackendAlreadyRegistered::message() const
+{
+  std::ostringstream msg;
+  msg << "Backend " << backend_ << " has already been registered.";
+  return msg.str();
+}
+
+std::string
 nest::KeyError::message() const
 {
   std::ostringstream msg;
@@ -447,4 +468,16 @@ std::string
 nest::InternalError::message() const
 {
   return msg_;
+}
+
+std::string
+nest::LayerExpected::message() const
+{
+  return std::string();
+}
+
+std::string
+nest::LayerNodeExpected::message() const
+{
+  return std::string();
 }

@@ -39,8 +39,9 @@
 #include "nest_types.h"
 #include "node.h"
 #include "per_thread_bool_indicator.h"
-#include "target_table.h"
+#include "secondary_event.h"
 #include "spike_data.h"
+#include "target_table.h"
 #include "vp_manager.h"
 
 // Includes from sli:
@@ -57,13 +58,13 @@ class EventDeliveryManager : public ManagerInterface
 {
 public:
   EventDeliveryManager();
-  virtual ~EventDeliveryManager();
+  ~EventDeliveryManager() override;
 
-  virtual void initialize();
-  virtual void finalize();
-
-  virtual void set_status( const DictionaryDatum& );
-  virtual void get_status( DictionaryDatum& );
+  void initialize() override;
+  void finalize() override;
+  void change_number_of_threads() override;
+  void set_status( const DictionaryDatum& ) override;
+  void get_status( DictionaryDatum& ) override;
 
   /**
    * Standard routine for sending events. This method decides if
@@ -230,10 +231,19 @@ public:
   void init_moduli();
 
   /**
-   * Set cumulative time measurements for collocating buffers
-   * and for communication to zero; set local spike counter to zero.
+   * Set local spike counter to zero.
    */
-  virtual void reset_timers_counters();
+  virtual void reset_counters();
+
+  /**
+   * Set time measurements for internal profiling to zero (reg. prep.)
+   */
+  virtual void reset_timers_for_preparation();
+
+  /**
+   * Set time measurements for internal profiling to zero (reg. sim. dyn.)
+   */
+  virtual void reset_timers_for_dynamics();
 
 private:
   template < typename SpikeDataT >
@@ -326,8 +336,7 @@ private:
    * Sets marker in MPI buffer that signals end of communication
    * across MPI ranks.
    */
-  void set_complete_marker_target_data_( const thread tid,
-    const AssignedRanks& assigned_ranks,
+  void set_complete_marker_target_data_( const AssignedRanks& assigned_ranks,
     const SendBufferPosition& send_buffer_position );
 
   /**
@@ -382,7 +391,7 @@ private:
    * - Third dim: lag
    * - Fourth dim: Target (will be converted in SpikeData)
    */
-  std::vector< std::vector< std::vector< std::vector< Target > > > > spike_register_;
+  std::vector< std::vector< std::vector< std::vector< Target > > > > emitted_spikes_register_;
 
   /**
    * Register for node IDs of precise neurons that spiked. This is a 4-dim
@@ -394,7 +403,7 @@ private:
    * - Third dim: lag
    * - Fourth dim: OffGridTarget (will be converted in OffGridSpikeData)
    */
-  std::vector< std::vector< std::vector< std::vector< OffGridTarget > > > > off_grid_spike_register_;
+  std::vector< std::vector< std::vector< std::vector< OffGridTarget > > > > off_grid_emitted_spike_register_;
 
   /**
    * Buffer to collect the secondary events
@@ -402,18 +411,6 @@ private:
    */
   std::vector< unsigned int > send_buffer_secondary_events_;
   std::vector< unsigned int > recv_buffer_secondary_events_;
-
-  /**
-   * Time that was spent on collocation of MPI buffers during the last call to
-   * simulate.
-   */
-  double time_collocate_;
-
-  /**
-   * Time that was spent on communication of events during the last call to
-   * simulate.
-   */
-  double time_communicate_;
 
   /**
    * Number of generated spike events (both off- and on-grid) during the last
@@ -432,15 +429,26 @@ private:
   bool buffer_size_target_data_has_changed_;
   //!< whether size of MPI buffer for communication of spikes was changed
   bool buffer_size_spike_data_has_changed_;
+  //!< whether size of MPI buffer for communication of spikes can be decreased
+  bool decrease_buffer_size_spike_data_;
 
   PerThreadBoolIndicator gather_completed_checker_;
+
+#ifdef TIMER_DETAILED
+  // private stop watches for benchmarking purposes
+  // (intended for internal core developers, not for use in the public API)
+  Stopwatch sw_collocate_spike_data_;
+  Stopwatch sw_communicate_spike_data_;
+  Stopwatch sw_deliver_spike_data_;
+  Stopwatch sw_communicate_target_data_;
+#endif
 };
 
 inline void
 EventDeliveryManager::reset_spike_register_( const thread tid )
 {
-  for ( std::vector< std::vector< std::vector< Target > > >::iterator it = spike_register_[ tid ].begin();
-        it < spike_register_[ tid ].end();
+  for ( std::vector< std::vector< std::vector< Target > > >::iterator it = emitted_spikes_register_[ tid ].begin();
+        it < emitted_spikes_register_[ tid ].end();
         ++it )
   {
     for ( std::vector< std::vector< Target > >::iterator iit = it->begin(); iit < it->end(); ++iit )
@@ -449,10 +457,10 @@ EventDeliveryManager::reset_spike_register_( const thread tid )
     }
   }
 
-  for (
-    std::vector< std::vector< std::vector< OffGridTarget > > >::iterator it = off_grid_spike_register_[ tid ].begin();
-    it < off_grid_spike_register_[ tid ].end();
-    ++it )
+  for ( std::vector< std::vector< std::vector< OffGridTarget > > >::iterator it =
+          off_grid_emitted_spike_register_[ tid ].begin();
+        it < off_grid_emitted_spike_register_[ tid ].end();
+        ++it )
   {
     for ( std::vector< std::vector< OffGridTarget > >::iterator iit = it->begin(); iit < it->end(); ++iit )
     {
@@ -470,8 +478,8 @@ EventDeliveryManager::is_marked_for_removal_( const Target& target )
 inline void
 EventDeliveryManager::clean_spike_register_( const thread tid )
 {
-  for ( std::vector< std::vector< std::vector< Target > > >::iterator it = spike_register_[ tid ].begin();
-        it < spike_register_[ tid ].end();
+  for ( std::vector< std::vector< std::vector< Target > > >::iterator it = emitted_spikes_register_[ tid ].begin();
+        it < emitted_spikes_register_[ tid ].end();
         ++it )
   {
     for ( std::vector< std::vector< Target > >::iterator iit = it->begin(); iit < it->end(); ++iit )
@@ -480,10 +488,10 @@ EventDeliveryManager::clean_spike_register_( const thread tid )
       iit->erase( new_end, iit->end() );
     }
   }
-  for (
-    std::vector< std::vector< std::vector< OffGridTarget > > >::iterator it = off_grid_spike_register_[ tid ].begin();
-    it < off_grid_spike_register_[ tid ].end();
-    ++it )
+  for ( std::vector< std::vector< std::vector< OffGridTarget > > >::iterator it =
+          off_grid_emitted_spike_register_[ tid ].begin();
+        it < off_grid_emitted_spike_register_[ tid ].end();
+        ++it )
   {
     for ( std::vector< std::vector< OffGridTarget > >::iterator iit = it->begin(); iit < it->end(); ++iit )
     {

@@ -27,12 +27,10 @@
 
 #include "pp_psc_delta.h"
 
-// C++ includes:
-#include <limits>
 
 // Includes from libnestutil:
-#include "dict_util.h"
 #include "compose.hpp"
+#include "dict_util.h"
 #include "numerics.h"
 
 // Includes from nestkernel:
@@ -43,8 +41,6 @@
 // Includes from sli:
 #include "dict.h"
 #include "dictutils.h"
-#include "doubledatum.h"
-#include "integerdatum.h"
 
 namespace nest
 {
@@ -60,7 +56,7 @@ template <>
 void
 RecordablesMap< pp_psc_delta >::create()
 {
-  // use standard names whereever you can for consistency!
+  // use standard names wherever you can for consistency!
   insert_( names::V_m, &pp_psc_delta::get_V_m_ );
   insert_( names::E_sfa, &pp_psc_delta::get_E_sfa_ );
 }
@@ -145,7 +141,6 @@ nest::pp_psc_delta::Parameters_::get( DictionaryDatum& d ) const
 void
 nest::pp_psc_delta::Parameters_::set( const DictionaryDatum& d, Node* node )
 {
-
   updateValueParam< double >( d, names::I_e, I_e_, node );
   updateValueParam< double >( d, names::C_m, c_m_, node );
   updateValueParam< double >( d, names::tau_m, tau_m_, node );
@@ -177,11 +172,11 @@ nest::pp_psc_delta::Parameters_::set( const DictionaryDatum& d, Node* node )
 
   if ( tau_sfa_.size() != q_sfa_.size() )
   {
-    throw BadProperty( String::compose(
-      "'tau_sfa' and 'q_sfa' need to have the same dimension.\nSize of "
-      "tau_sfa: %1\nSize of q_sfa: %2",
-      tau_sfa_.size(),
-      q_sfa_.size() ) );
+    throw BadProperty(
+      String::compose( "'tau_sfa' and 'q_sfa' need to have the same dimension.\nSize of "
+                       "tau_sfa: %1\nSize of q_sfa: %2",
+        tau_sfa_.size(),
+        q_sfa_.size() ) );
   }
 
   if ( c_m_ <= 0 )
@@ -254,7 +249,7 @@ nest::pp_psc_delta::Buffers_::Buffers_( const Buffers_&, pp_psc_delta& n )
  * ---------------------------------------------------------------- */
 
 nest::pp_psc_delta::pp_psc_delta()
-  : Archiving_Node()
+  : ArchivingNode()
   , P_()
   , S_()
   , B_( *this )
@@ -263,7 +258,7 @@ nest::pp_psc_delta::pp_psc_delta()
 }
 
 nest::pp_psc_delta::pp_psc_delta( const pp_psc_delta& n )
-  : Archiving_Node( n )
+  : ArchivingNode( n )
   , P_( n.P_ )
   , S_( n.S_ )
   , B_( n.B_, *this )
@@ -275,10 +270,8 @@ nest::pp_psc_delta::pp_psc_delta( const pp_psc_delta& n )
  * ---------------------------------------------------------------- */
 
 void
-nest::pp_psc_delta::init_state_( const Node& proto )
+nest::pp_psc_delta::init_state_()
 {
-  const pp_psc_delta& pr = downcast< pp_psc_delta >( proto );
-  S_ = pr.S_;
   S_.r_ = Time( Time::ms( P_.t_ref_remaining_ ) ).get_steps();
 }
 
@@ -288,22 +281,21 @@ nest::pp_psc_delta::init_buffers_()
   B_.spikes_.clear();   //!< includes resize
   B_.currents_.clear(); //!< includes resize
   B_.logger_.reset();   //!< includes resize
-  Archiving_Node::clear_history();
+  ArchivingNode::clear_history();
 }
 
 void
-nest::pp_psc_delta::calibrate()
+nest::pp_psc_delta::pre_run_hook()
 {
-
   B_.logger_.init();
 
   V_.h_ = Time::get_resolution().get_ms();
-  V_.rng_ = kernel().rng_manager.get_rng( get_thread() );
+  V_.rng_ = get_vp_specific_rng( get_thread() );
 
   V_.P33_ = std::exp( -V_.h_ / P_.tau_m_ );
   V_.P30_ = 1 / P_.c_m_ * ( 1 - V_.P33_ ) * P_.tau_m_;
 
-  if ( P_.dead_time_ != 0 && P_.dead_time_ < V_.h_ )
+  if ( P_.dead_time_ != 0 and P_.dead_time_ < V_.h_ )
   {
     P_.dead_time_ = V_.h_;
   }
@@ -343,7 +335,8 @@ nest::pp_psc_delta::calibrate()
   {
     // Choose dead time rate parameter such that mean equals dead_time
     V_.dt_rate_ = P_.dead_time_shape_ / P_.dead_time_;
-    V_.gamma_dev_.set_order( P_.dead_time_shape_ );
+    gamma_distribution::param_type param( P_.dead_time_shape_ );
+    V_.gamma_dist_.param( param );
   }
 
   else
@@ -361,10 +354,6 @@ nest::pp_psc_delta::calibrate()
 void
 nest::pp_psc_delta::update( Time const& origin, const long from, const long to )
 {
-
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   for ( long lag = from; lag < to; ++lag )
   {
 
@@ -410,16 +399,16 @@ nest::pp_psc_delta::update( Time const& origin, const long from, const long to )
         else
         {
           // Draw Poisson random number of spikes
-          V_.poisson_dev_.set_lambda( rate * V_.h_ * 1e-3 );
-          n_spikes = V_.poisson_dev_.ldev( V_.rng_ );
+          poisson_distribution::param_type param( rate * V_.h_ * 1e-3 );
+          n_spikes = V_.poisson_dist_( V_.rng_, param );
         }
 
         if ( n_spikes > 0 ) // Is there a spike? Then set the new dead time.
         {
-          // Set dead time interval according to paramters
+          // Set dead time interval according to parameters
           if ( P_.dead_time_random_ )
           {
-            S_.r_ = Time( Time::ms( V_.gamma_dev_( V_.rng_ ) / V_.dt_rate_ ) ).get_steps();
+            S_.r_ = Time( Time::ms( V_.gamma_dist_( V_.rng_ ) / V_.dt_rate_ ) ).get_steps();
           }
           else
           {

@@ -23,13 +23,21 @@
 Classes defining the different PyNEST types
 """
 
-
-from ..ll_api import *
+from ..ll_api import sli_func, sps, sr, spp, take_array_index
 from .. import pynestkernel as kernel
-from .hl_api_helper import *
+from .hl_api_helper import (
+    broadcast,
+    get_parameters,
+    get_parameters_hierarchical_addressing,
+    is_iterable,
+    is_literal,
+    restructure_data,
+)
 from .hl_api_simulation import GetKernelStatus
 
 import numpy
+import json
+from math import floor, log
 
 try:
     import pandas
@@ -38,11 +46,16 @@ except ImportError:
     HAVE_PANDAS = False
 
 __all__ = [
-    'SynapseCollection',
+    'CollocatedSynapses',
+    'Compartments',
     'CreateParameter',
-    'NodeCollection',
     'Mask',
+    'NodeCollection',
     'Parameter',
+    'Receptors',
+    'serializable',
+    'SynapseCollection',
+    'to_json',
 ]
 
 
@@ -73,8 +86,8 @@ def CreateParameter(parametertype, specs):
 
     **Parameter types**
 
-    Some available parameter types (`parametertype` parameter), their function and
-    acceptable keys for their corresponding specification dictionaries
+    Examples of available parameter types (`parametertype` parameter), with their function and
+    acceptable keys for their corresponding specification dictionaries:
 
     * Constant
         ::
@@ -89,26 +102,20 @@ def CreateParameter(parametertype, specs):
                 {'min' : float, # minimum value, default: 0.0
                  'max' : float} # maximum value, default: 1.0
 
-            # random parameter with normal distribution, optionally truncated
-            # to [min,max)
+            # random parameter with normal distribution
             'normal':
                 {'mean' : float, # mean value, default: 0.0
-                 'sigma': float, # standard deviation, default: 1.0
-                 'min'  : float, # minimum value, default: -inf
-                 'max'  : float} # maximum value, default: +inf
+                 'std'  : float} # standard deviation, default: 1.0
 
-            # random parameter with lognormal distribution,
-            # optionally truncated to [min,max)
+            # random parameter with lognormal distribution
             'lognormal' :
-                {'mu'   : float, # mean value of logarithm, default: 0.0
-                 'sigma': float, # standard deviation of log, default: 1.0
-                 'min'  : float, # minimum value, default: -inf
-                 'max'  : float} # maximum value, default: +inf
+                {'mean' : float, # mean value of logarithm, default: 0.0
+                 'std'  : float} # standard deviation of log, default: 1.0
     """
     return sli_func('CreateParameter', {parametertype: specs})
 
 
-class NodeCollectionIterator(object):
+class NodeCollectionIterator:
     """
     Iterator class for `NodeCollection`.
 
@@ -129,19 +136,17 @@ class NodeCollectionIterator(object):
         if self._increment > len(self._nc) - 1:
             raise StopIteration
 
-        val = sli_func('Take', self._nc._datum, [self._increment + (self._increment >= 0)])
+        val = sli_func('Take_g_a', self._nc._datum, [self._increment, self._increment + 1, 1])
         self._increment += 1
         return val
 
-    next = __next__  # Python2.x
 
-
-class NodeCollection(object):
+class NodeCollection:
     """
     Class for `NodeCollection`.
 
     `NodeCollection` represents the nodes of a network. The class supports
-    iteration, concatination, indexing, slicing, membership, length, convertion to and
+    iteration, concatenation, indexing, slicing, membership, length, conversion to and
     from lists, test for membership, and test for equality. By using the
     membership functions :py:func:`get()` and :py:func:`set()`, you can get and set desired
     parameters.
@@ -150,6 +155,10 @@ class NodeCollection(object):
     list of nodes to a `NodeCollection` with ``nest.NodeCollection(list)``.
 
     If your nodes have spatial extent, use the member parameter ``spatial`` to get the spatial information.
+
+    Slicing a NodeCollection follows standard Python slicing syntax: nc[start:stop:step], where start and stop
+    gives the zero-indexed right-open range of nodes, and step gives the step length between nodes. The step must
+    be strictly positive.
 
     Example
     -------
@@ -182,7 +191,9 @@ class NodeCollection(object):
 
     _datum = None
 
-    def __init__(self, data):
+    def __init__(self, data=None):
+        if data is None:
+            data = []
         if isinstance(data, kernel.SLIDatum):
             if data.dtype != "nodecollectiontype":
                 raise TypeError("Need NodeCollection Datum.")
@@ -200,29 +211,66 @@ class NodeCollection(object):
     def __add__(self, other):
         if not isinstance(other, NodeCollection):
             raise NotImplementedError()
+
         return sli_func('join', self._datum, other._datum)
 
     def __getitem__(self, key):
-
         if isinstance(key, slice):
             if key.start is None:
-                start = 1
+                start = 0
             else:
-                start = key.start + 1 if key.start >= 0 else key.start
+                start = key.start
+                if abs(start) > self.__len__():
+                    raise IndexError('slice start value outside of the NodeCollection')
             if key.stop is None:
                 stop = self.__len__()
             else:
-                stop = key.stop if key.stop >= 0 else key.stop
+                stop = key.stop
+                if abs(stop) > self.__len__():
+                    raise IndexError('slice stop value outside of the NodeCollection')
             step = 1 if key.step is None else key.step
+            if step < 1:
+                raise IndexError('slicing step for NodeCollection must be strictly positive')
 
-            return sli_func('Take', self._datum, [start, stop, step])
+            return sli_func('Take_g_a', self._datum, [start, stop, step])
         elif isinstance(key, (int, numpy.integer)):
-            return sli_func('Take', self._datum, [key + (key >= 0)])
+            if key >= self.__len__() or key + self.__len__() < 0:
+                raise IndexError('index value outside of the NodeCollection')
+            return sli_func('Take_g_a', self._datum, [key, key + 1, 1])
+        elif isinstance(key, (list, tuple)):
+            if len(key) == 0:
+                return NodeCollection([])
+            # Must check if elements are bool first, because bool inherits from int
+            if all(isinstance(x, bool) for x in key):
+                if len(key) != len(self):
+                    raise IndexError('Bool index array must be the same length as NodeCollection')
+                np_key = numpy.array(key, dtype=bool)
+            # Checking that elements are not instances of bool too, because bool inherits from int
+            elif all(isinstance(x, int) and not isinstance(x, bool) for x in key):
+                np_key = numpy.array(key, dtype=numpy.uint64)
+                if len(numpy.unique(np_key)) != len(np_key):
+                    raise ValueError('All node IDs in a NodeCollection have to be unique')
+            else:
+                raise TypeError('Indices must be integers or bools')
+            return take_array_index(self._datum, np_key)
+        elif isinstance(key, numpy.ndarray):
+            if len(key) == 0:
+                return NodeCollection([])
+            if len(key.shape) != 1:
+                raise TypeError('NumPy indices must one-dimensional')
+            is_booltype = numpy.issubdtype(key.dtype, numpy.dtype(bool).type)
+            if not (is_booltype or numpy.issubdtype(key.dtype, numpy.integer)):
+                raise TypeError('NumPy indices must be an array of integers or bools')
+            if is_booltype and len(key) != len(self):
+                raise IndexError('Bool index array must be the same length as NodeCollection')
+            if not is_booltype and len(numpy.unique(key)) != len(key):
+                raise ValueError('All node IDs in a NodeCollection have to be unique')
+            return take_array_index(self._datum, key)
         else:
-            raise IndexError('only integers and slices are valid indices')
+            raise IndexError('only integers, slices, lists, tuples, and numpy arrays are valid indices')
 
     def __contains__(self, node_id):
-        return sli_func('MemberQ', self._datum, node_id)
+        return sli_func('InCollection', self._datum, node_id)
 
     def __eq__(self, other):
         if not isinstance(other, NodeCollection):
@@ -230,11 +278,13 @@ class NodeCollection(object):
 
         if self.__len__() != other.__len__():
             return False
+
         return sli_func('eq', self, other)
 
     def __neq__(self, other):
         if not isinstance(other, NodeCollection):
             raise NotImplementedError()
+
         return not self == other
 
     def __len__(self):
@@ -287,8 +337,37 @@ class NodeCollection(object):
 
         See Also
         --------
-        set
+        :py:func:`set`,
+        :py:func:`GetStatus()<nest.lib.hl_api_info.GetStatus>`,
+        :py:func:`SetStatus()<nest.lib.hl_api_info.SetStatus>`
+
+        Examples
+        --------
+
+        >>>    nodes.get()
+               {'archiver_length': (0, 0, 0),
+               'beta_Ca': (0.001, 0.001, 0.001),
+               'C_m': (250.0, 250.0, 250.0),
+               ...
+               'V_th': (-55.0, -55.0, -55.0),
+               'vp': (0, 0, 0)}
+
+        >>>    nodes.get('V_m')
+               (-70.0, -70.0, -70.0)
+
+        >>>    nodes[0].get('V_m')
+               -70.0
+
+        >>>    nodes.get('V_m', 'C_m')
+               {'V_m': (-70.0, -70.0, -70.0), 'C_m': (250.0, 250.0, 250.0)}
+
+        >>>    voltmeter.get('events', 'senders')
+               array([...], dtype=int64)
         """
+
+        if not self:
+            raise ValueError('Cannot get parameter of empty NodeCollection')
+
         # ------------------------- #
         #      Checks of input      #
         # ------------------------- #
@@ -300,6 +379,7 @@ class NodeCollection(object):
                 raise ImportError('Pandas could not be imported')
         else:
             raise TypeError('Got unexpected keyword argument')
+
         pandas_output = output == 'pandas'
 
         if len(params) == 0:
@@ -308,6 +388,10 @@ class NodeCollection(object):
         elif len(params) == 1:
             # params is a tuple with a string or list of strings
             result = get_parameters(self, params[0])
+            if params[0] == 'compartments':
+                result = Compartments(self, result)
+            elif params[0] == 'receptors':
+                result = Receptors(self, result)
         else:
             # Hierarchical addressing
             result = get_parameters_hierarchical_addressing(self, params)
@@ -341,8 +425,8 @@ class NodeCollection(object):
         Parameters
         ----------
         params : str or dict or list
-            Dictionary of parameters or list of dictionaries of parameters of
-            same length as the `NodeCollection`.
+            Dictionary of parameters (either lists or single values) or list of dictionaries of parameters
+            of same length as the `NodeCollection`.
         kwargs : keyword argument pairs
             Named arguments of parameters of the elements in the `NodeCollection`.
 
@@ -352,16 +436,42 @@ class NodeCollection(object):
             If the input params are of the wrong form.
         KeyError
             If the specified parameter does not exist for the nodes.
+
+        See Also
+        --------
+        :py:func:`get`,
+        :py:func:`SetStatus()<nest.lib.hl_api_info.SetStatus>`,
+        :py:func:`GetStatus()<nest.lib.hl_api_info.GetStatus>`
         """
 
+        if not self:
+            return
         if kwargs and params is None:
             params = kwargs
         elif kwargs and params:
             raise TypeError("must either provide params or kwargs, but not both.")
 
-        if isinstance(params, dict) and self[0].get('local'):
+        local_nodes = [self.local] if len(self) == 1 else self.local
 
-            contains_list = [is_iterable(vals) and not is_iterable(self[0].get(key)) for key, vals in params.items()]
+        if isinstance(params, dict) and 'compartments' in params:
+            if isinstance(params['compartments'], Compartments):
+                params['compartments'] = params['compartments'].get_tuple()
+            elif params['compartments'] is None:
+                # Adding compartments has been handled by the += operator, so we can remove the entry.
+                params.pop('compartments')
+
+        if isinstance(params, dict) and 'receptors' in params:
+            if isinstance(params['receptors'], Receptors):
+                params['receptors'] = params['receptors'].get_tuple()
+            elif params['receptors'] is None:
+                # Adding receptors has been handled by the += operator, so we can remove the entry.
+                params.pop('receptors')
+
+        if isinstance(params, dict) and all(local_nodes):
+
+            node_params = self[0].get()
+            contains_list = [is_iterable(vals) and key in node_params and not is_iterable(node_params[key]) for
+                             key, vals in params.items()]
 
             if any(contains_list):
                 temp_param = [{} for _ in range(self.__len__())]
@@ -376,8 +486,7 @@ class NodeCollection(object):
                 params = temp_param
 
         if (isinstance(params, (list, tuple)) and self.__len__() != len(params)):
-            raise TypeError(
-                "status dict must be a dict, or a list of dicts of length len(nodes)")
+            raise TypeError("status dict must be a dict, or a list of dicts of length {} ".format(self.__len__()))
 
         sli_func('SetStatus', self._datum, params)
 
@@ -387,7 +496,9 @@ class NodeCollection(object):
         """
         if self.__len__() == 0:
             return []
-        return list(self.get('global_id')) if self.__len__() > 1 else [self.get('global_id')]
+
+        return (list(self.get('global_id')) if len(self) > 1
+                else [self.get('global_id')])
 
     def index(self, node_id):
         """
@@ -404,16 +515,37 @@ class NodeCollection(object):
             If the node ID is not in the `NodeCollection`.
         """
         index = sli_func('Find', self._datum, node_id)
+
         if index == -1:
             raise ValueError('{} is not in NodeCollection'.format(node_id))
+
         return index
 
+    def __bool__(self):
+        """Converts the NodeCollection to a bool. False if it is empty, True otherwise."""
+        return len(self) > 0
+
+    def __array__(self, dtype=None):
+        """Convert the NodeCollection to a NumPy array."""
+        return numpy.array(self.tolist(), dtype=dtype)
+
     def __getattr__(self, attr):
+        if not self:
+            raise AttributeError('Cannot get attribute of empty NodeCollection')
+
         if attr == 'spatial':
             metadata = sli_func('GetMetadata', self._datum)
             val = metadata if metadata else None
             super().__setattr__(attr, val)
             return self.spatial
+
+        # NumPy compatibility check:
+        # raises AttributeError to tell NumPy that interfaces other than
+        # __array__ are not available (otherwise get_parameters would be
+        # queried, KeyError would be raised, and all would crash)
+        if attr.startswith('__array_'):
+            raise AttributeError
+
         return self.get(attr)
 
     def __setattr__(self, attr, value):
@@ -425,7 +557,7 @@ class NodeCollection(object):
             self.set({attr: value})
 
 
-class SynapseCollectionIterator(object):
+class SynapseCollectionIterator:
     """
     Iterator class for SynapseCollection.
     """
@@ -439,10 +571,8 @@ class SynapseCollectionIterator(object):
     def __next__(self):
         return SynapseCollection(next(self._iter))
 
-    next = __next__  # Python2.x
 
-
-class SynapseCollection(object):
+class SynapseCollection:
     """
     Class for Connections.
 
@@ -473,6 +603,8 @@ class SynapseCollection(object):
                 raise TypeError("Expected Connection Datum.")
             # self._datum needs to be a list of Connection datums.
             self._datum = [data]
+
+        self.print_full = False
 
     def __iter__(self):
         return SynapseCollectionIterator(self)
@@ -510,45 +642,94 @@ class SynapseCollection(object):
     def __str__(self):
         """
         Printing a `SynapseCollection` returns something of the form:
-            *--------*-------------*
-            | source | 1, 1, 2, 2, |
-            *--------*-------------*
-            | target | 1, 2, 1, 2, |
-            *--------*-------------*
+
+             source   target   synapse model   weight   delay
+            -------- -------- --------------- -------- -------
+                  1        4  static_synapse    1.000   1.000
+                  2        4  static_synapse    2.000   1.000
+                  1        3    stdp_synapse    4.000   1.000
+                  1        4    stdp_synapse    3.000   1.000
+                  2        3    stdp_synapse    3.000   1.000
+                  2        4    stdp_synapse    2.000   1.000
+
+        If your SynapseCollection has more than 36 elements, only the first and last 15 connections are printed. To
+        display all, first set `print_full = True`.
+
+        ::
+
+            conns = nest.GetConnections()
+            conns.print_full = True
+            print(conns)
         """
-        srcs = self.get('source')
-        trgt = self.get('target')
+
+        def format_row_(s, t, sm, w, dly):
+            try:
+                return f'{s:>{src_len-1}d} {t:>{trg_len}d} {sm:>{sm_len}s} {w:>#{w_len}.{4}g} {dly:>#{d_len}.{4}g}'
+            except ValueError:
+                # Used when we have many connections and print_full=False
+                return f'{s:>{src_len-1}} {t:>{trg_len}} {sm:>{sm_len}} {w:>{w_len}} {dly:>{d_len}}'
+
+        MAX_SIZE_FULL_PRINT = 35  # 35 is arbitrarily chosen.
+
+        params = self.get()
+
+        if len(params) == 0:
+            return 'The synapse collection does not contain any connections.'
+
+        srcs = params['source']
+        trgt = params['target']
+        wght = params['weight']
+        dlay = params['delay']
+        s_model = params['synapse_model']
 
         if isinstance(srcs, int):
             srcs = [srcs]
-        if isinstance(trgt, int):
             trgt = [trgt]
+            wght = [wght]
+            dlay = [dlay]
+            s_model = [s_model]
+
+        src_h = 'source'
+        trg_h = 'target'
+        sm_h = 'synapse model'
+        w_h = 'weight'
+        d_h = 'delay'
+
+        # Find maximum number of characters for each column, used to determine width of column
+        src_len = max(len(src_h) + 2, floor(log(max(srcs), 10)))
+        trg_len = max(len(trg_h) + 2, floor(log(max(trgt), 10)))
+        sm_len = max(len(sm_h) + 2, len(max(s_model, key=len)))
+        w_len = len(w_h) + 2
+        d_len = len(d_h) + 2
 
         # 35 is arbitrarily chosen.
-        if len(srcs) < 35:
-            source = '| source | ' + ''.join(str(e)+', ' for e in srcs) + '|'
-            target = '| target | ' + ''.join(str(e)+', ' for e in trgt) + '|'
-        else:
-            source = ('| source | ' + ''.join(str(e)+', ' for e in srcs[:15]) +
-                      '... ' + ''.join(str(e)+', ' for e in srcs[-15:]) + '|')
-            target = ('| target | ' + ''.join(str(e)+', ' for e in trgt[:15]) +
-                      '... ' + ''.join(str(e)+', ' for e in trgt[-15:]) + '|')
+        if len(srcs) >= MAX_SIZE_FULL_PRINT and not self.print_full:
+            # u'\u22EE ' is the unicode for vertical ellipsis, used when we have many connections
+            srcs = srcs[:15] + [u'\u22EE '] + srcs[-15:]
+            trgt = trgt[:15] + [u'\u22EE '] + trgt[-15:]
+            wght = wght[:15] + [u'\u22EE '] + wght[-15:]
+            dlay = dlay[:15] + [u'\u22EE '] + dlay[-15:]
+            s_model = s_model[:15] + [u'\u22EE '] + s_model[-15:]
 
-        borderline_s = '*--------*' + '-'*(len(source) - 12) + '-*'
-        borderline_t = '*--------*' + '-'*(len(target) - 12) + '-*'
-        borderline_m = max(borderline_s, borderline_t)
+        headers = f'{src_h:^{src_len}} {trg_h:^{trg_len}} {sm_h:^{sm_len}} {w_h:^{w_len}} {d_h:^{d_len}}' + '\n'
+        borders = '-'*src_len + ' ' + '-'*trg_len + ' ' + '-'*sm_len + ' ' + '-'*w_len + ' ' + '-'*d_len + '\n'
+        output = '\n'.join(format_row_(s, t, sm, w, d) for s, t, sm, w, d in zip(srcs, trgt, s_model, wght, dlay))
+        result = headers + borders + output
 
-        result = (borderline_s + '\n' + source + '\n' + borderline_m + '\n' +
-                  target + '\n' + borderline_t)
         return result
 
     def __getattr__(self, attr):
+        if attr == 'distance':
+            dist = sli_func('Distance', self._datum)
+            super().__setattr__(attr, dist)
+            return self.distance
+
         return self.get(attr)
 
     def __setattr__(self, attr, value):
         # `_datum` is the only property of SynapseCollection that should not be
         # interpreted as a property of the model
-        if attr == '_datum':
+        if attr == '_datum' or attr == 'print_full':
             super().__setattr__(attr, value)
         else:
             self.set({attr: value})
@@ -592,7 +773,7 @@ class SynapseCollection(object):
             All parameters, or, if keys is a list of strings, a dictionary with
             lists of corresponding parameters
         type:
-            If keys is a string, the corrsponding parameter(s) is returned
+            If keys is a string, the corresponding parameter(s) is returned
 
 
         Raises
@@ -601,21 +782,44 @@ class SynapseCollection(object):
             If input params are of the wrong form.
         KeyError
             If the specified parameter does not exist for the connections.
+
+        See Also
+        --------
+        set
+
+        Examples
+        --------
+
+        >>>    conns.get()
+               {'delay': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                ...
+                'weight': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]}
+
+        >>>    conns.get('weight')
+               [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+        >>>    conns[0].get('weight')
+               1.0
+
+        >>>    nodes.get(['source', 'weight'])
+               {'source': [1, 1, 1, 2, 2, 2, 3, 3, 3],
+                'weight': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]}
         """
         pandas_output = output == 'pandas'
         if pandas_output and not HAVE_PANDAS:
             raise ImportError('Pandas could not be imported')
 
-        # Return empty tuple if we have no connections or if we have done a
-        # nest.ResetKernel()
-        num_conn = GetKernelStatus('num_connections')
-        if self.__len__() == 0 or num_conn == 0:
-            return ()
+        # Return empty dictionary if we have no connections or if we have done a nest.ResetKernel()
+        num_conns = GetKernelStatus('num_connections')  # Has to be called first because it involves MPI communication.
+        if self.__len__() == 0 or num_conns == 0:
+            # Return empty tuple if get is called with an argument
+            return {} if keys is None else ()
 
         if keys is None:
             cmd = 'GetStatus'
         elif is_literal(keys):
-            cmd = 'GetStatus {{ /{0} get }} Map'.format(keys)
+            #  Extracting the correct values will be done in restructure_data below
+            cmd = 'GetStatus'
         elif is_iterable(keys):
             keys_str = " ".join("/{0}".format(x) for x in keys)
             cmd = 'GetStatus {{ [ [ {0} ] ] get }} Map'.format(keys_str)
@@ -652,8 +856,8 @@ class SynapseCollection(object):
         Parameters
         ----------
         params : str or dict or list
-            Dictionary of parameters or list of dictionaries of parameters of
-            same length as the `SynapseCollection`.
+            Dictionary of parameters (either lists or single values) or list of dictionaries of parameters
+            of same length as `SynapseCollection`.
         kwargs : keyword argument pairs
             Named arguments of parameters of the elements in the `SynapseCollection`.
 
@@ -663,19 +867,21 @@ class SynapseCollection(object):
             If input params are of the wrong form.
         KeyError
             If the specified parameter does not exist for the connections.
+
+        See Also
+        --------
+        get
         """
 
         # This was added to ensure that the function is a nop (instead of,
         # for instance, raising an exception) when applied to an empty
         # SynapseCollection, or after having done a nest.ResetKernel().
-        if self.__len__() == 0 or GetKernelStatus()['network_size'] == 0:
+        if self.__len__() == 0 or GetKernelStatus('network_size') == 0:
             return
 
         if (isinstance(params, (list, tuple)) and
                 self.__len__() != len(params)):
-            raise TypeError(
-                "status dict must be a dict, or a list of dicts of length "
-                "len(nodes)")
+            raise TypeError("status dict must be a dict, or a list of dicts of length {}".format(self.__len__()))
 
         if kwargs and params is None:
             params = kwargs
@@ -683,7 +889,9 @@ class SynapseCollection(object):
             raise TypeError("must either provide params or kwargs, but not both.")
 
         if isinstance(params, dict):
-            contains_list = [is_iterable(vals) and not is_iterable(self[0].get(key)) for key, vals in params.items()]
+            node_params = self[0].get()
+            contains_list = [is_iterable(vals) and key in node_params and not is_iterable(node_params[key]) for
+                             key, vals in params.items()]
 
             if any(contains_list):
                 temp_param = [{} for _ in range(self.__len__())]
@@ -705,8 +913,44 @@ class SynapseCollection(object):
         sr('2 arraystore')
         sr('Transpose { arrayload pop SetStatus } forall')
 
+    def disconnect(self):
+        """
+        Disconnect the connections in the `SynapseCollection`.
+        """
+        sps(self._datum)
+        sr('Disconnect_a')
 
-class Mask(object):
+
+class CollocatedSynapses:
+    """
+    Class for collocated synapse specifications.
+
+    Wrapper around a list of specifications, used when calling :py:func:`.Connect`.
+
+    Example
+    -------
+
+    ::
+        nodes = nest.Create('iaf_psc_alpha', 3)
+        syn_spec = nest.CollocatedSynapses({'weight': 4., 'delay': 1.5},
+                                       {'synapse_model': 'stdp_synapse'},
+                                       {'synapse_model': 'stdp_synapse', 'alpha': 3.})
+        nest.Connect(nodes, nodes, conn_spec='one_to_one', syn_spec=syn_spec)
+
+        conns = nest.GetConnections()
+
+        print(conns.alpha)
+        print(len(syn_spec))
+    """
+
+    def __init__(self, *args):
+        self.syn_specs = args
+
+    def __len__(self):
+        return len(self.syn_specs)
+
+
+class Mask:
     """
     Class for spatial masks.
 
@@ -726,19 +970,19 @@ class Mask(object):
         self._datum = datum
 
     # Generic binary operation
-    def _binop(self, op, other):
-        if not isinstance(other, Mask):
+    def _binop(self, op, rhs):
+        if not isinstance(rhs, Mask):
             raise NotImplementedError()
-        return sli_func(op, self._datum, other._datum)
+        return sli_func(op, self._datum, rhs._datum)
 
-    def __or__(self, other):
-        return self._binop("or", other)
+    def __or__(self, rhs):
+        return self._binop("or", rhs)
 
-    def __and__(self, other):
-        return self._binop("and", other)
+    def __and__(self, rhs):
+        return self._binop("and", rhs)
 
-    def __sub__(self, other):
-        return self._binop("sub", other)
+    def __sub__(self, rhs):
+        return self._binop("sub", rhs)
 
     def Inside(self, point):
         """
@@ -757,7 +1001,7 @@ class Mask(object):
         return sli_func("Inside", point, self._datum)
 
 
-class Parameter(object):
+class Parameter:
     """
     Class for parameters
 
@@ -777,64 +1021,76 @@ class Parameter(object):
         self._datum = datum
 
     # Generic binary operation
-    def _binop(self, op, other, params=None):
-        if isinstance(other, (int, float)):
-            other = CreateParameter('constant', {'value': float(other)})
-        if not isinstance(other, Parameter):
+    def _binop(self, op, rhs, params=None):
+        if isinstance(rhs, (int, float)):
+            rhs = CreateParameter('constant', {'value': float(rhs)})
+        if not isinstance(rhs, Parameter):
             raise NotImplementedError()
 
         if params is None:
-            return sli_func(op, self._datum, other._datum)
+            return sli_func(op, self._datum, rhs._datum)
         else:
-            return sli_func(op, self._datum, other._datum, params)
+            return sli_func(op, self._datum, rhs._datum, params)
 
-    def __add__(self, other):
-        return self._binop("add", other)
+    def __add__(self, rhs):
+        return self._binop("add", rhs)
 
-    def __radd__(self, other):
-        return self + other
+    def __radd__(self, lhs):
+        return self + lhs
 
-    def __sub__(self, other):
-        return self._binop("sub", other)
+    def __sub__(self, rhs):
+        return self._binop("sub", rhs)
 
-    def __rsub__(self, other):
-        return self * (-1) + other
+    def __rsub__(self, lhs):
+        return self * (-1) + lhs
+
+    def __pos__(self):
+        return self
 
     def __neg__(self):
         return self * (-1)
 
-    def __mul__(self, other):
-        return self._binop("mul", other)
+    def __mul__(self, rhs):
+        return self._binop("mul", rhs)
 
-    def __rmul__(self, other):
-        return self * other
+    def __rmul__(self, lhs):
+        return self * lhs
 
-    def __div__(self, other):
-        return self._binop("div", other)
+    def __truediv__(self, rhs):
+        return self._binop("div", rhs)
 
-    def __truediv__(self, other):
-        return self._binop("div", other)
+    def __rtruediv__(self, lhs):
+        rhs_inv = CreateParameter('constant', {'value': 1 / float(self.GetValue())})
+        return rhs_inv._binop("mul", lhs)
 
     def __pow__(self, exponent):
+        try:
+            expo = float(exponent)
+        except TypeError:
+            raise TypeError("unsupported operand type for **: only int and float allow as exponent")
+
         return sli_func("pow", self._datum, float(exponent))
 
-    def __lt__(self, other):
-        return self._binop("compare", other, {'comparator': 0})
+    def __rpow__(self, lhs):
+        raise TypeError("unsupported operand type for **: only int and float allow as exponent")
 
-    def __le__(self, other):
-        return self._binop("compare", other, {'comparator': 1})
+    def __lt__(self, rhs):
+        return self._binop("compare", rhs, {'comparator': 0})
 
-    def __eq__(self, other):
-        return self._binop("compare", other, {'comparator': 2})
+    def __le__(self, rhs):
+        return self._binop("compare", rhs, {'comparator': 1})
 
-    def __ne__(self, other):
-        return self._binop("compare", other, {'comparator': 3})
+    def __eq__(self, rhs):
+        return self._binop("compare", rhs, {'comparator': 2})
 
-    def __ge__(self, other):
-        return self._binop("compare", other, {'comparator': 4})
+    def __ne__(self, rhs):
+        return self._binop("compare", rhs, {'comparator': 3})
 
-    def __gt__(self, other):
-        return self._binop("compare", other, {'comparator': 5})
+    def __ge__(self, rhs):
+        return self._binop("compare", rhs, {'comparator': 4})
+
+    def __gt__(self, rhs):
+        return self._binop("compare", rhs, {'comparator': 5})
 
     def GetValue(self):
         """
@@ -856,7 +1112,7 @@ class Parameter(object):
                 import nest
 
                 # normal distribution parameter
-                P = nest.CreateParameter('normal', {'mean': 0.0, 'sigma': 1.0})
+                P = nest.CreateParameter('normal', {'mean': 0.0, 'std': 1.0})
 
                 # get out value
                 P.GetValue()
@@ -880,3 +1136,115 @@ class Parameter(object):
                 if len(pos) != len(positions[0]):
                     raise ValueError('All positions must have the same number of dimensions')
             return sli_func('Apply', self._datum, {'source': spatial_nc, 'targets': positions})
+
+
+class CmBase:
+
+    def __init__(self, node_collection, elements):
+        if not isinstance(node_collection, NodeCollection):
+            raise TypeError(f'node_collection must be a NodeCollection, got {type(node_collection)}')
+        if not isinstance(elements, tuple):
+            raise TypeError(f'elements must be a tuple of dicts, got {type(elements)}')
+        self._elements = elements
+        self._node_collection = node_collection
+
+    def __add__(self, other):
+        new_elements = list(self._elements)
+        if isinstance(other, dict):
+            new_elements += [other]
+        elif isinstance(other, (tuple, list)):
+            if not all(isinstance(d, dict) for d in other):
+                raise TypeError(
+                    f'{self.__class__.__name__} can only be added with dicts, lists of dicts, '
+                    f'or other {self.__class__.__name__}')
+            new_elements += list(other)
+        elif isinstance(other, self.__class__):
+            new_elements += list(other._elements)
+        else:
+            raise NotImplementedError(f'{self.__class__.__name__} can only be added with dicts, lists of dicts,'
+                                      f' or other {self.__class__.__name__}, got {type(other)}')
+
+        return self.__class__(self._node_collection, tuple(new_elements))
+
+    def __iadd__(self, other):
+        if isinstance(other, dict):
+            new_elements = [other]
+        elif isinstance(other, (tuple, list)):
+            if not all(isinstance(d, dict) for d in other):
+                raise TypeError(f'{self.__class__.__name__} can only be added with dicts, lists of dicts, '
+                                f'or other {self.__class__.__name__}')
+            new_elements = list(other)
+        elif isinstance(other, self.__class__):
+            new_elements = list(other._elements)
+        else:
+            raise NotImplementedError(f'{self.__class__.__name__} can only be added with dicts, lists of dicts,'
+                                      f' or other {self.__class__.__name__}, got {type(other)}')
+        self._node_collection.set({f'add_{self.__class__.__name__.lower()}': new_elements})
+        # implicit `return None` to flag elements as added by returning None
+
+    def __getitem__(self, key):
+        return self._elements[key]
+
+    def __str__(self):
+        return str(self._elements)
+
+    def get_tuple(self):
+        return self._elements
+
+
+class Compartments(CmBase):
+    # No specialization here because all is done in the base class based on the class name.
+    pass
+
+
+class Receptors(CmBase):
+    # No specialization here because all is done in the base class based on the class name.
+    pass
+
+
+def serializable(data):
+    """Make data serializable for JSON.
+
+    Parameters
+    ----------
+    data : any
+
+    Returns
+    -------
+    data_serialized : str, int, float, list, dict
+        Data can be encoded to JSON
+    """
+
+    if isinstance(data, (numpy.ndarray, NodeCollection)):
+        return data.tolist()
+    if isinstance(data, SynapseCollection):
+        # Get full information from SynapseCollection
+        return serializable(data.get())
+    if isinstance(data, kernel.SLILiteral):
+        # Get name of SLILiteral.
+        return data.name
+    if isinstance(data, (list, tuple)):
+        return [serializable(d) for d in data]
+    if isinstance(data, dict):
+        return dict([(key, serializable(value)) for key, value in data.items()])
+    return data
+
+
+def to_json(data, **kwargs):
+    """Serialize data to JSON.
+
+    Parameters
+    ----------
+    data : any
+    kwargs : keyword argument pairs
+        Named arguments of parameters for `json.dumps` function.
+
+    Returns
+    -------
+    data_json : str
+        JSON format of the data
+    """
+
+    data_serialized = serializable(data)
+    data_json = json.dumps(data_serialized, **kwargs)
+    return data_json

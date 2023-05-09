@@ -35,31 +35,32 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
+/* BeginUserDocs: neuron, integrate-and-fire
 
-Name: iaf_psc_exp_htum - Leaky integrate-and-fire neuron model with exponential
-                         PSCs.
+Short description
++++++++++++++++++
 
-Description:
+Leaky integrate-and-fire model with separate relative and absolute refractory period
 
-iaf_psc_exp_htum is an implementation of a leaky integrate-and-fire model
-with exponential shaped postsynaptic currents (PSCs) according to [1], and first
-described in [2]. The postsynaptic currents have an infinitely short rise time.
+Description
++++++++++++
+
+``iaf_psc_exp_htum`` is an implementation of a leaky integrate-and-fire model
+with exponential shaped postsynaptic currents (PSCs) according to [1]_.
+The postsynaptic currents have an infinitely short rise time.
 In particular, this model allows setting an absolute and relative
-refractory time separately, as required by [1].
+refractory time separately, as required by [1]_.
 
 The threshold crossing is followed by an absolute refractory period
-(t_ref_abs) during which the membrane potential is clamped to the resting
-potential. During the total refractory period (t_ref_tot), the membrane
+(``t_ref_abs``) during which the membrane potential is clamped to the resting
+potential. During the total refractory period (``t_ref_tot``), the membrane
 potential evolves, but the neuron will not emit a spike, even if the
 membrane potential reaches threshold. The total refractory time must be
 larger or equal to the absolute refractory time. If equal, the
 refractoriness of the model if equivalent to the other models of NEST.
 
 The linear subthreshold dynamics is integrated by the Exact
-Integration scheme [3]. The neuron dynamics is solved on the time
+Integration scheme [2]_. The neuron dynamics is solved on the time
 grid given by the computation step size. Incoming as well as emitted
 spikes are forced to that grid.
 
@@ -68,28 +69,40 @@ equation represents a piecewise constant external current.
 
 The general framework for the consistent formulation of systems with
 neuron like dynamics interacting by point events is described in
-[3]. A flow chart can be found in [4].
+[2]_. A flow chart can be found in [3]_.
 
-Remarks:
+.. note::
 
-The present implementation uses individual variables for the
-components of the state vector and the non-zero matrix elements of
-the propagator.  Because the propagator is a lower triangular matrix
-no full matrix multiplication needs to be carried out and the
-computation can be done "in place" i.e. no temporary state vector
-object is required.
+   The present implementation uses individual variables for the
+   components of the state vector and the non-zero matrix elements of
+   the propagator. Because the propagator is a lower triangular matrix,
+   no full matrix multiplication needs to be carried out and the
+   computation can be done "in place", i.e. no temporary state vector
+   object is required.
 
-The template support of recent C++ compilers enables a more succinct
-formulation without loss of runtime performance already at minimal
-optimization levels. A future version of iaf_psc_exp_htum will probably
-address the problem of efficient usage of appropriate vector and
-matrix objects.
+   The template support of recent C++ compilers enables a more succinct
+   formulation without loss of runtime performance already at minimal
+   optimization levels. A future version of iaf_psc_exp_htum will probably
+   address the problem of efficient usage of appropriate vector and
+   matrix objects.
+
+.. note::
+
+   If ``tau_m`` is very close to ``tau_syn_ex`` or ``tau_syn_in``, the model
+   will numerically behave as if ``tau_m`` is equal to ``tau_syn_ex`` or
+   ``tau_syn_in``, respectively, to avoid numerical instabilities.
+
+    For implementation details see the
+    `IAF_neurons_singularity <../model_details/IAF_neurons_singularity.ipynb>`_ notebook.
 
 
-Parameters:
+See also [4]_.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
-\verbatim embed:rst
+
 ===========  ====== ========================================================
  E_L          mV     Resting membrane potenial
  C_m          pF     Capacity of the membrane
@@ -104,19 +117,10 @@ The following parameters can be set in the status dictionary.
  I_e          pA     Constant input current
  t_spike      ms     Point in time of last spike
 ===========  ====== ========================================================
-\endverbatim
 
-Remarks:
+References
+++++++++++
 
-If tau_m is very close to tau_syn_ex or tau_syn_in, the model
-will numerically behave as if tau_m is equal to tau_syn_ex or
-tau_syn_in, respectively, to avoid numerical instabilities.
-For details, please see IAF_neurons_singularity.ipynb in
-the NEST source code (docs/model_details).
-
-References:
-
-\verbatim embed:rst
 .. [1] Tsodyks M, Uziel A, Markram H (2000). Synchrony generation in recurrent
        networks with frequency-dependent synapses. The Journal of Neuroscience,
        20,RC50:1-5. URL: https://infoscience.epfl.ch/record/183402
@@ -131,17 +135,20 @@ References:
        space analysis of synchronous spiking in cortical neural
        networks. Neurocomputing 38-40:565-571.
        DOI: https://doi.org/10.1016/S0925-2312(01)00409-X
-\endverbatim
 
-Sends: SpikeEvent
+Sends
++++++
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+SpikeEvent
 
-FirstVersion: March 2006
+Receives
+++++++++
 
-Author: Moritz Helias
-*/
-class iaf_psc_exp_htum : public Archiving_Node
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+EndUserDocs */
+
+class iaf_psc_exp_htum : public ArchivingNode
 {
 
 public:
@@ -156,25 +163,24 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
-  void update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access the State_ class/member
   friend class RecordablesMap< iaf_psc_exp_htum >;
@@ -282,7 +288,7 @@ private:
   struct Variables_
   {
     /** Amplitude of the synaptic current.
-        This value is chosen such that a post-synaptic potential with
+        This value is chosen such that a postsynaptic potential with
         weight one has an amplitude of 1 mV.
         @note mog - I assume this, not checked.
     */
@@ -383,7 +389,7 @@ iaf_psc_exp_htum::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d, P_ );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
 
@@ -399,7 +405,7 @@ iaf_psc_exp_htum::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

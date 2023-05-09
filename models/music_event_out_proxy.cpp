@@ -50,11 +50,6 @@ nest::music_event_out_proxy::Parameters_::Parameters_()
 {
 }
 
-nest::music_event_out_proxy::Parameters_::Parameters_( const Parameters_& op )
-  : port_name_( op.port_name_ )
-{
-}
-
 nest::music_event_out_proxy::State_::State_()
   : published_( false )
   , port_width_( -1 )
@@ -75,7 +70,7 @@ void
 nest::music_event_out_proxy::Parameters_::set( const DictionaryDatum& d, State_& s )
 {
   // TODO: This is not possible, as P_ does not know about get_name()
-  //  if(d->known(names::port_name) && s.published_)
+  //  if(d->known(names::port_name) and s.published_)
   //    throw MUSICPortAlreadyPublished(get_name(), P_.port_name_);
 
   if ( not s.published_ )
@@ -125,19 +120,12 @@ nest::music_event_out_proxy::~music_event_out_proxy()
 }
 
 void
-nest::music_event_out_proxy::init_state_( const Node& /* np */ )
-{
-  // const music_event_out_proxy& sd = dynamic_cast<const
-  // music_event_out_proxy&>(np);
-}
-
-void
 nest::music_event_out_proxy::init_buffers_()
 {
 }
 
 void
-nest::music_event_out_proxy::calibrate()
+nest::music_event_out_proxy::pre_run_hook()
 {
   // only publish the output port once,
   if ( not S_.published_ )

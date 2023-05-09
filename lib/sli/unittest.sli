@@ -36,25 +36,6 @@
 /unittest namespace
 
 /** @BeginDocumentation
-Name: unittest::exit_test_gracefully - End test script and report it as skipped
-Synopsis: literal exit_test_gracefully -> -
-Description:
-This function will terminate NEST/SLI with a return code signaling that a
-test was skipped. It should be used to leave test scripts that have special
-prerequisites.
-Parameters:
-literal - Reason for exit
-Example:
-/unittest using
-is_threaded not { /skipped_no_openmp exit_test_gracefully } if
-*/
-/exit_test_gracefully[/literaltype]
-{
-  statusdict/exitcodes :: exch get quit_i
-} bind def
-
-
-/** @BeginDocumentation
 Name: unittest::assert_or_die - Check condition and quit with exit code 1 if it fails
 
 Synopsis: {condition}        assert_or_die -> -
@@ -323,7 +304,7 @@ SeeAlso: unittest::fail_or_die, assert, quit
  (echo ")
  /func load pcvs join
  ( exec" | ) join 
- statusdict /argv get First join
+ (') statusdict /argv get First (') join join join
  ( -) join /command Set
 
 % command ==
@@ -397,7 +378,7 @@ SeeAlso: unittest::failbutnocrash_or_die, assert, quit
  (echo ")
  /func load pcvs join
  ( exec" | ) join 
- statusdict /argv get First join
+ (') statusdict /argv get First (') join join join
  ( -) join /command Set
 
 % command ==
@@ -495,7 +476,7 @@ SeeAlso: unittest::failbutnocrash_or_die, assert, quit
   (echo ")
   /func load pcvs join
   ( exec" | ) join 
-  statusdict /argv get First join
+  (') statusdict /argv get First (') join join join
   ( -) join /command Set
 
   command 0 shpawn

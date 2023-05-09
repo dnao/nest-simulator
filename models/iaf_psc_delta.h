@@ -34,29 +34,31 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingroup psc
+/* BeginUserDocs: neuron, integrate-and-fire, current-based
 
-Name: iaf_psc_delta - Leaky integrate-and-fire neuron model.
+Short description
++++++++++++++++++
 
-Description:
+Current-based leaky integrate-and-fire neuron model with delta-shaped
+postsynaptic currents
 
-iaf_psc_delta is an implementation of a leaky integrate-and-fire model
+Description
++++++++++++
+
+``iaf_psc_delta`` is an implementation of a leaky integrate-and-fire model
 where the potential jumps on each spike arrival.
 
 The threshold crossing is followed by an absolute refractory period
 during which the membrane potential is clamped to the resting potential.
 
 Spikes arriving while the neuron is refractory, are discarded by
-default. If the property "refractory_input" is set to true, such
+default. If the property ``refractory_input`` is set to true, such
 spikes are added to the membrane potential at the end of the
 refractory period, dampened according to the interval between
 arrival and end of refractoriness.
 
-The linear subthresold dynamics is integrated by the Exact
-Integration scheme [1]. The neuron dynamics is solved on the time
+The linear subthreshold dynamics is integrated by the Exact
+Integration scheme [1]_. The neuron dynamics is solved on the time
 grid given by the computation step size. Incoming as well as emitted
 spikes are forced to that grid.
 
@@ -65,7 +67,7 @@ equation represents a piecewise constant external current.
 
 The general framework for the consistent formulation of systems with
 neuron like dynamics interacting by point events is described in
-[1].  A flow chart can be found in [2].
+[1]_.  A flow chart can be found in [2]_.
 
 Critical tests for the formulation of the neuron model are the
 comparisons of simulation results for different computation step
@@ -76,27 +78,11 @@ of the nest simulation kernel because it is at the same time complex
 enough to exhibit non-trivial dynamics and simple enough compute
 relevant measures analytically.
 
-Remarks:
-
-The present implementation uses individual variables for the
-components of the state vector and the non-zero matrix elements of
-the propagator.  Because the propagator is a lower triangular matrix
-no full matrix multiplication needs to be carried out and the
-computation can be done "in place" i.e. no temporary state vector
-object is required.
-
-The template support of recent C++ compilers enables a more succinct
-formulation without loss of runtime performance already at minimal
-optimization levels. A future version of iaf_psc_delta will probably
-address the problem of efficient usage of appropriate vector and
-matrix objects.
-
-
-Parameters:
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
 
-\verbatim embed:rst
 ================= ======= ======================================================
  V_m              mV      Membrane potential
  E_L              mV      Resting membrane potential
@@ -106,15 +92,14 @@ The following parameters can be set in the status dictionary.
  V_th             mV      Spike threshold
  V_reset          mV      Reset potential of the membrane
  I_e              pA      Constant input current
- V_min            mV      Absolute lower value for the membrane potenial
+ V_min            mV      Absolute lower value for the membrane potential
  refractory_input boolean If true, do not discard input during
                           refractory period. Default: false
 ================= ======= ======================================================
-\endverbatim
 
-References:
+References
+++++++++++
 
-\verbatim embed:rst
 .. [1] Rotter S,  Diesmann M (1999). Exact simulation of
        time-invariant linear systems with applications to neuronal
        modeling. Biologial Cybernetics 81:381-402.
@@ -123,17 +108,40 @@ References:
        space analysis of synchronous spiking in cortical neural
        networks. Neurocomputing 38-40:565-571.
        DOI: https://doi.org/10.1016/S0925-2312(01)00409-X
-\endverbatim
 
-Sends: SpikeEvent
+Sends
++++++
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+SpikeEvent
 
-Author:  September 1999, Diesmann, Gewaltig
+Receives
+++++++++
 
-SeeAlso: iaf_psc_alpha, iaf_psc_exp, iaf_psc_delta_ps
-*/
-class iaf_psc_delta : public Archiving_Node
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+See also
+++++++++
+
+iaf_psc_alpha, iaf_psc_exp, iaf_psc_delta_ps
+
+EndUserDocs */
+
+/**
+ * The present implementation uses individual variables for the
+ * components of the state vector and the non-zero matrix elements of
+ * the propagator. Because the propagator is a lower triangular matrix,
+ * no full matrix multiplication needs to be carried out and the
+ * computation can be done "in place", i.e. no temporary state vector
+ * object is required.
+ *
+ * The template support of recent C++ compilers enables a more succinct
+ * formulation without loss of runtime performance already at minimal
+ * optimization levels. A future version of iaf_psc_delta will probably
+ * address the problem of efficient usage of appropriate vector and
+ * matrix objects.
+ */
+
+class iaf_psc_delta : public ArchivingNode
 {
 
 public:
@@ -148,25 +156,24 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
-  void update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access the State_ class/member
   friend class RecordablesMap< iaf_psc_delta >;
@@ -352,7 +359,7 @@ iaf_psc_delta::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d, P_ );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
 
@@ -368,7 +375,7 @@ iaf_psc_delta::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

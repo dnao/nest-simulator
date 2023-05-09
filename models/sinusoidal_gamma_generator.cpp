@@ -26,7 +26,6 @@
 
 // C++ includes:
 #include <cmath>
-#include <limits>
 
 // External includes:
 #include <gsl/gsl_sf_gamma.h>
@@ -42,11 +41,10 @@
 #include "universal_data_logger_impl.h"
 
 // Includes from sli:
-#include "arraydatum.h"
+#include "booldatum.h"
 #include "dict.h"
 #include "dictutils.h"
 #include "doubledatum.h"
-#include "integerdatum.h"
 
 namespace nest
 {
@@ -83,8 +81,8 @@ nest::sinusoidal_gamma_generator::Parameters_::Parameters_( const Parameters_& p
 {
 }
 
-nest::sinusoidal_gamma_generator::Parameters_& nest::sinusoidal_gamma_generator::Parameters_::operator=(
-  const Parameters_& p )
+nest::sinusoidal_gamma_generator::Parameters_&
+nest::sinusoidal_gamma_generator::Parameters_::operator=( const Parameters_& p )
 {
   if ( this == &p )
   {
@@ -142,16 +140,11 @@ nest::sinusoidal_gamma_generator::Parameters_::get( DictionaryDatum& d ) const
 }
 
 void
-nest::sinusoidal_gamma_generator::State_::get( DictionaryDatum& ) const
-{
-}
-
-void
 nest::sinusoidal_gamma_generator::Parameters_::set( const DictionaryDatum& d,
   const sinusoidal_gamma_generator& n,
   Node* node )
 {
-  if ( not n.is_model_prototype() && d->known( names::individual_spike_trains ) )
+  if ( not n.is_model_prototype() and d->known( names::individual_spike_trains ) )
   {
     throw BadProperty(
       "The individual_spike_trains property can only be set as"
@@ -218,8 +211,7 @@ nest::sinusoidal_gamma_generator::Parameters_::set( const DictionaryDatum& d,
  * ---------------------------------------------------------------- */
 
 nest::sinusoidal_gamma_generator::sinusoidal_gamma_generator()
-  : DeviceNode()
-  , device_()
+  : StimulationDevice()
   , P_()
   , S_()
   , B_( *this )
@@ -228,8 +220,7 @@ nest::sinusoidal_gamma_generator::sinusoidal_gamma_generator()
 }
 
 nest::sinusoidal_gamma_generator::sinusoidal_gamma_generator( const sinusoidal_gamma_generator& n )
-  : DeviceNode( n )
-  , device_( n.device_ )
+  : StimulationDevice( n )
   , P_( n.P_ )
   , S_( n.S_ )
   , B_( n.B_, *this )
@@ -241,18 +232,15 @@ nest::sinusoidal_gamma_generator::sinusoidal_gamma_generator( const sinusoidal_g
  * ---------------------------------------------------------------- */
 
 void
-nest::sinusoidal_gamma_generator::init_state_( const Node& proto )
+nest::sinusoidal_gamma_generator::init_state_()
 {
-  const sinusoidal_gamma_generator& pr = downcast< sinusoidal_gamma_generator >( proto );
-
-  device_.init_state( pr.device_ );
-  S_ = pr.S_;
+  StimulationDevice::init_state();
 }
 
 void
 nest::sinusoidal_gamma_generator::init_buffers_()
 {
-  device_.init_buffers();
+  StimulationDevice::init_buffers();
   B_.logger_.reset();
 
   std::vector< double >( P_.num_trains_, kernel().simulation_manager.get_time().get_ms() ).swap( B_.t0_ms_ );
@@ -271,7 +259,7 @@ nest::sinusoidal_gamma_generator::deltaLambda_( const Parameters_& p, double t_a
   }
 
   double deltaLambda = p.order_ * p.rate_ * ( t_b - t_a );
-  if ( std::abs( p.amplitude_ ) > 0 && std::abs( p.om_ ) > 0 )
+  if ( std::abs( p.amplitude_ ) > 0 and std::abs( p.om_ ) > 0 )
   {
     deltaLambda +=
       -p.order_ * p.amplitude_ / p.om_ * ( std::cos( p.om_ * t_b + p.phi_ ) - std::cos( p.om_ * t_a + p.phi_ ) );
@@ -282,14 +270,14 @@ nest::sinusoidal_gamma_generator::deltaLambda_( const Parameters_& p, double t_a
 // ----------------------------------------------------
 
 void
-nest::sinusoidal_gamma_generator::calibrate()
+nest::sinusoidal_gamma_generator::pre_run_hook()
 {
   // ensures initialization in case mm connected after Simulate
   B_.logger_.init();
-  device_.calibrate();
+  StimulationDevice::pre_run_hook();
 
   V_.h_ = Time::get_resolution().get_ms();
-  V_.rng_ = kernel().rng_manager.get_rng( get_thread() );
+  V_.rng_ = get_vp_specific_rng( get_thread() );
 
   const double t_ms = kernel().simulation_manager.get_time().get_ms();
 
@@ -321,9 +309,6 @@ nest::sinusoidal_gamma_generator::hazard_( port tgt_idx ) const
 void
 nest::sinusoidal_gamma_generator::update( Time const& origin, const long from, const long to )
 {
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   for ( long lag = from; lag < to; ++lag )
   {
     const Time t = Time( Time::step( origin.get_steps() + lag + 1 ) );
@@ -333,7 +318,7 @@ nest::sinusoidal_gamma_generator::update( Time const& origin, const long from, c
     S_.rate_ = P_.rate_ + P_.amplitude_ * std::sin( P_.om_ * V_.t_ms_ + P_.phi_ );
 
     // t_steps_-1 since t_steps is end of interval, while activity det by start
-    if ( P_.num_trains_ > 0 && S_.rate_ > 0 && device_.is_active( Time::step( V_.t_steps_ - 1 ) ) )
+    if ( P_.num_trains_ > 0 and S_.rate_ > 0 and StimulationDevice::is_active( Time::step( V_.t_steps_ - 1 ) ) )
     {
       if ( P_.individual_spike_trains_ )
       {
@@ -360,7 +345,7 @@ nest::sinusoidal_gamma_generator::event_hook( DSSpikeEvent& e )
 {
   // get port number --- see #737
   const port tgt_idx = e.get_port();
-  assert( 0 <= tgt_idx && static_cast< size_t >( tgt_idx ) < B_.t0_ms_.size() );
+  assert( 0 <= tgt_idx and static_cast< size_t >( tgt_idx ) < B_.t0_ms_.size() );
 
   if ( V_.rng_->drand() < hazard_( tgt_idx ) )
   {
@@ -376,4 +361,35 @@ nest::sinusoidal_gamma_generator::handle( DataLoggingRequest& e )
   B_.logger_.handle( e );
 }
 
+/* ----------------------------------------------------------------
+ * Other functions
+ * ---------------------------------------------------------------- */
+
+void
+nest::sinusoidal_gamma_generator::set_data_from_stimulation_backend( std::vector< double >& input_param )
+{
+  Parameters_ ptmp = P_; // temporary copy in case of errors
+
+  // For the input backend
+  if ( not input_param.empty() )
+  {
+    if ( input_param.size() != 6 )
+    {
+      throw BadParameterValue(
+        "The size of the data for the sinusoidal_gamma_generator needs to 6 "
+        "[frequency, phase, order, rate, amplitude, individual_spike_trains]." );
+    }
+    DictionaryDatum d = DictionaryDatum( new Dictionary );
+    ( *d )[ names::frequency ] = DoubleDatum( input_param[ 0 ] );
+    ( *d )[ names::phase ] = DoubleDatum( input_param[ 1 ] );
+    ( *d )[ names::order ] = DoubleDatum( input_param[ 2 ] );
+    ( *d )[ names::rate ] = DoubleDatum( input_param[ 3 ] );
+    ( *d )[ names::amplitude ] = DoubleDatum( input_param[ 4 ] );
+    ( *d )[ names::individual_spike_trains ] = BoolDatum( input_param[ 5 ] );
+    ptmp.set( d, *this, this );
+  }
+
+  // if we get here, temporary contains consistent set of properties
+  P_ = ptmp;
+}
 #endif // HAVE_GSL

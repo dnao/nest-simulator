@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 # nest_script.py
@@ -30,8 +30,6 @@ values are forwarded through MUSIC to the receiver.
 
 """
 import nest
-import music
-import numpy
 
 proxy = nest.Create('music_cont_out_proxy', 1)
 proxy.port_name = 'out'

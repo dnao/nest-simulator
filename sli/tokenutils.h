@@ -152,7 +152,7 @@ FT
 getValue( const Token& t )
 {
   FT* value = dynamic_cast< FT* >( t.datum() );
-  if ( value == NULL )
+  if ( not value )
   {
     throw TypeMismatch();
   }
@@ -177,7 +177,7 @@ void
 setValue( const Token& t, FT const& value )
 {
   FT* old = dynamic_cast< FT* >( t.datum() );
-  if ( old == NULL )
+  if ( not old )
   {
     throw TypeMismatch();
   }
@@ -228,12 +228,6 @@ double getValue< double >( const Token& );
 
 template <>
 void setValue< double >( const Token&, double const& value );
-
-template <>
-float getValue< float >( const Token& );
-
-template <>
-void setValue< float >( const Token&, float const& value );
 
 
 template <>

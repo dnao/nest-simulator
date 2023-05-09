@@ -27,7 +27,7 @@ Simple example for how to repeat a stimulation protocol
 using the ``origin`` property of devices.
 
 In this example, a ``poisson_generator`` generates a spike train that is
-recorded directly by a ``spike_detector``, using the following paradigm:
+recorded directly by a ``spike_recorder``, using the following paradigm:
 
 1. A single trial last for 1000 ms.
 2. Within each trial, the ``poisson_generator`` is active from 100 ms to 500 ms.
@@ -41,12 +41,12 @@ relative to the ``origin``.
 
 
 ###############################################################################
-# First, the modules needed for simulation and analyis are imported.
+# First, the modules needed for simulation and analysis are imported.
 
 
 import nest
 import nest.raster_plot
-
+import matplotlib.pyplot as plt
 
 ###############################################################################
 # Second, we set the parameters so the ``poisson_generator`` generates 1000
@@ -55,7 +55,7 @@ import nest.raster_plot
 
 rate = 1000.0  # generator rate in spikes/s
 start = 100.0  # start of simulation relative to trial start, in ms
-stop = 500.0  # end of simulation relative to trial start, in ms
+stop = 500.0   # end of simulation relative to trial start, in ms
 
 
 ###############################################################################
@@ -63,7 +63,7 @@ stop = 500.0  # end of simulation relative to trial start, in ms
 
 
 trial_duration = 1000.0  # trial duration, in ms
-num_trials = 5      # number of trials to perform
+num_trials = 5           # number of trials to perform
 
 
 ###############################################################################
@@ -75,26 +75,23 @@ num_trials = 5      # number of trials to perform
 
 
 nest.ResetKernel()
-pg = nest.Create('poisson_generator',
-                 params={'rate': rate,
-                         'start': start,
-                         'stop': stop}
-                 )
+pg_params = {'rate': rate, 'start': start, 'stop': stop}
+pg = nest.Create('poisson_generator', params=pg_params)
 
 
 ###############################################################################
-# The ``spike_detector`` is created and the handle stored in `sd`.
+# The ``spike_recorder`` is created and the handle stored in `sr`.
 
 
-sd = nest.Create('spike_detector')
+sr = nest.Create('spike_recorder')
 
 
 ###############################################################################
 # The ``Connect`` function connects the nodes so spikes from pg are collected by
-# the ``spike_detector`` `sd`
+# the ``spike_recorder`` `sr`
 
 
-nest.Connect(pg, sd)
+nest.Connect(pg, sr)
 
 
 ###############################################################################
@@ -105,7 +102,7 @@ nest.Connect(pg, sd)
 
 
 for n in range(num_trials):
-    pg.origin = nest.GetKernelStatus('time')
+    pg.origin = nest.biological_time
     nest.Simulate(trial_duration)
 
 
@@ -115,6 +112,6 @@ for n in range(num_trials):
 # 100 ms into each trial. This is due to sub-optimal automatic placement of
 # histogram bin borders.
 
-nest.raster_plot.from_device(sd, hist=True, hist_binwidth=100.,
+nest.raster_plot.from_device(sr, hist=True, hist_binwidth=100.,
                              title='Repeated stimulation by Poisson generator')
-nest.raster_plot.show()
+plt.show()

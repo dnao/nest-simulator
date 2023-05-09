@@ -34,8 +34,8 @@
 #include <string>
 
 // Includes from libnestutil:
-#include "numerics.h"
 #include "dict_util.h"
+#include "numerics.h"
 
 // Includes from nestkernel:
 #include "exceptions.h"
@@ -68,6 +68,7 @@ nest::rate_neuron_ipn< TNonlinearities >::Parameters_::Parameters_()
   , lambda_( 1.0 ) // ms
   , sigma_( 1.0 )
   , mu_( 0.0 )
+  , rectify_rate_( 0.0 )
   , linear_summation_( true )
   , rectify_output_( false )
   , mult_coupling_( false )
@@ -94,6 +95,7 @@ nest::rate_neuron_ipn< TNonlinearities >::Parameters_::get( DictionaryDatum& d )
   def< double >( d, names::lambda, lambda_ );
   def< double >( d, names::sigma, sigma_ );
   def< double >( d, names::mu, mu_ );
+  def< double >( d, names::rectify_rate, rectify_rate_ );
   def< bool >( d, names::linear_summation, linear_summation_ );
   def< bool >( d, names::rectify_output, rectify_output_ );
   def< bool >( d, names::mult_coupling, mult_coupling_ );
@@ -110,6 +112,7 @@ nest::rate_neuron_ipn< TNonlinearities >::Parameters_::set( const DictionaryDatu
   updateValueParam< double >( d, names::tau, tau_, node );
   updateValueParam< double >( d, names::lambda, lambda_, node );
   updateValueParam< double >( d, names::mu, mu_, node );
+  updateValueParam< double >( d, names::rectify_rate, rectify_rate_, node );
   updateValueParam< double >( d, names::sigma, sigma_, node );
   updateValueParam< bool >( d, names::linear_summation, linear_summation_, node );
   updateValueParam< bool >( d, names::rectify_output, rectify_output_, node );
@@ -144,6 +147,10 @@ nest::rate_neuron_ipn< TNonlinearities >::Parameters_::set( const DictionaryDatu
   if ( sigma_ < 0 )
   {
     throw BadProperty( "Noise parameter must not be negative." );
+  }
+  if ( rectify_rate_ < 0 )
+  {
+    throw BadProperty( "Rectifying rate must not be negative." );
   }
 }
 
@@ -180,7 +187,7 @@ nest::rate_neuron_ipn< TNonlinearities >::Buffers_::Buffers_( const Buffers_&, r
 
 template < class TNonlinearities >
 nest::rate_neuron_ipn< TNonlinearities >::rate_neuron_ipn()
-  : Archiving_Node()
+  : ArchivingNode()
   , P_()
   , S_()
   , B_( *this )
@@ -191,7 +198,7 @@ nest::rate_neuron_ipn< TNonlinearities >::rate_neuron_ipn()
 
 template < class TNonlinearities >
 nest::rate_neuron_ipn< TNonlinearities >::rate_neuron_ipn( const rate_neuron_ipn& n )
-  : Archiving_Node( n )
+  : ArchivingNode( n )
   , nonlinearities_( n.nonlinearities_ )
   , P_( n.P_ )
   , S_( n.S_ )
@@ -203,14 +210,6 @@ nest::rate_neuron_ipn< TNonlinearities >::rate_neuron_ipn( const rate_neuron_ipn
 /* ----------------------------------------------------------------
  * Node initialization functions
  * ---------------------------------------------------------------- */
-
-template < class TNonlinearities >
-void
-nest::rate_neuron_ipn< TNonlinearities >::init_state_( const Node& proto )
-{
-  const rate_neuron_ipn& pr = downcast< rate_neuron_ipn >( proto );
-  S_ = pr.S_;
-}
 
 template < class TNonlinearities >
 void
@@ -229,16 +228,16 @@ nest::rate_neuron_ipn< TNonlinearities >::init_buffers_()
   // initialize random numbers
   for ( unsigned int i = 0; i < buffer_size; i++ )
   {
-    B_.random_numbers[ i ] = V_.normal_dev_( kernel().rng_manager.get_rng( get_thread() ) );
+    B_.random_numbers[ i ] = V_.normal_dist_( get_vp_specific_rng( get_thread() ) );
   }
 
   B_.logger_.reset(); // includes resize
-  Archiving_Node::clear_history();
+  ArchivingNode::clear_history();
 }
 
 template < class TNonlinearities >
 void
-nest::rate_neuron_ipn< TNonlinearities >::calibrate()
+nest::rate_neuron_ipn< TNonlinearities >::pre_run_hook()
 {
   B_.logger_.init(); // ensures initialization in case mm connected after Simulate
 
@@ -271,9 +270,6 @@ nest::rate_neuron_ipn< TNonlinearities >::update_( Time const& origin,
   const long to,
   const bool called_from_wfr_update )
 {
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   const size_t buffer_size = kernel().connection_manager.get_min_delay();
   const double wfr_tol = kernel().simulation_manager.get_wfr_tol();
   bool wfr_tol_exceeded = false;
@@ -339,9 +335,9 @@ nest::rate_neuron_ipn< TNonlinearities >::update_( Time const& origin,
       S_.rate_ += V_.P2_ * H_in * ( delayed_rates_in + instant_rates_in );
     }
 
-    if ( P_.rectify_output_ and S_.rate_ < 0 )
+    if ( P_.rectify_output_ and S_.rate_ < P_.rectify_rate_ )
     {
-      S_.rate_ = 0;
+      S_.rate_ = P_.rectify_rate_;
     }
 
     if ( called_from_wfr_update )
@@ -379,7 +375,7 @@ nest::rate_neuron_ipn< TNonlinearities >::update_( Time const& origin,
     B_.random_numbers.resize( buffer_size, numerics::nan );
     for ( unsigned int i = 0; i < buffer_size; i++ )
     {
-      B_.random_numbers[ i ] = V_.normal_dev_( kernel().rng_manager.get_rng( get_thread() ) );
+      B_.random_numbers[ i ] = V_.normal_dist_( get_vp_specific_rng( get_thread() ) );
     }
   }
 

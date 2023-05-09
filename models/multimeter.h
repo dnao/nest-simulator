@@ -38,10 +38,15 @@
 #include "dictutils.h"
 #include "name.h"
 
-/* BeginDocumentation
+/* BeginUserDocs: device, recorder
+
+Short description
++++++++++++++++++
 
 Sampling continuous quantities from neurons
-###########################################
+
+Description
++++++++++++
 
 Most sampling use cases are covered by the ``multimeter``, which
 allows to record analog values from neurons. Models which have such
@@ -64,7 +69,7 @@ recordables to have them sampled during simulation.
    mm = nest.Create('multimeter', 1, {'record_from': ['V_m', 'g_ex']})
 
 The sampling interval for recordings (given in ms) can be controlled
-using the ``multimeter`` parameter `interval`. The default value of
+using the ``multimeter`` parameter ``interval``. The default value of
 1.0 ms can be changed by supplying a new value either in the call to
 ``Create`` or by using ``SetStatus`` on the model instance.
 
@@ -73,8 +78,8 @@ using the ``multimeter`` parameter `interval`. The default value of
    nest.SetStatus(mm, 'interval': 0.1})
 
 The recording interval must be greater than or equal to the
-:doc:`simulation resolution <running_simulations>`, which defaults to
-0.1 ms.
+:ref:`simulation resolution <simulation_resolution>`, which defaults
+to 0.1 ms.
 
 .. warning::
 
@@ -91,13 +96,13 @@ it should record from by using the standard ``Connect`` routine.
     nest.Connect(mm, neurons)
 
 To learn more about possible connection patterns and additional
-options when using ``Connect``, see the guide on :doc:`connection
+options when using ``Connect``, see the guide on :ref:`connection
 management <connection_management>`.
 
 The above call to ``Connect`` would fail if the neurons would not
-support the sampling of the values *V_m* and *g_ex*. It would also
-fail if carried out in the wrong direction, i.e., trying to connect the
-*neurons* to *mm*.
+support the sampling of the values ``V_m`` and ``g_ex``. It would also
+fail if carried out in the wrong direction, that is , trying to connect the
+neurons to `mm`.
 
 .. note::
 
@@ -105,7 +110,21 @@ fail if carried out in the wrong direction, i.e., trying to connect the
    ``record_from`` property is already set to record the variable ``V_m``
    from the neurons it is connected to.
 
-EndDocumentation */
+.. include:: ../models/recording_device.rst
+
+record_from
+    A list (default: `[]`) of parameters and state variables to sample
+    from the nodes, the multimeter is connected to. Potential
+    recordables are given in the corresponding model documentation.
+
+interval
+    A float (default: 1.0) specifying the interval in ms, at which
+    data is collected from the nodes, the multimeter is connected to.
+
+See also
+++++++++
+
+EndUserDocs */
 
 namespace nest
 {
@@ -122,13 +141,13 @@ public:
    *       sample their targets through local communication.
    */
   bool
-  has_proxies() const
+  has_proxies() const override
   {
     return false;
   }
 
   Name
-  get_element_type() const
+  get_element_type() const override
   {
     return names::recorder;
   }
@@ -142,20 +161,20 @@ public:
   using Node::handles_test_event;
   using Node::sends_signal;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( DataLoggingReply& );
+  void handle( DataLoggingReply& ) override;
 
-  SignalType sends_signal() const;
+  SignalType sends_signal() const override;
 
-  Type get_type() const;
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  Type get_type() const override;
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
-  void calibrate_time( const TimeConverter& tc );
+  void calibrate_time( const TimeConverter& tc ) override;
 
 protected:
-  void calibrate();
+  void pre_run_hook() override;
 
   /**
    * Collect and output membrane potential information.
@@ -164,7 +183,7 @@ protected:
    * that information. The sampled nodes must provide data from
    * the previous time slice.
    */
-  void update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
 
 private:
   struct Buffers_;
@@ -172,11 +191,12 @@ private:
   struct Parameters_
   {
     Time interval_;                   //!< recording interval, in ms
-    Time offset_;                     //!< offset relative to which interval is calculated, in ms
+    Time offset_;                     //!< offset relative to 0, in ms
     std::vector< Name > record_from_; //!< which data to record
 
     Parameters_();
     Parameters_( const Parameters_& );
+    Parameters_& operator=( const Parameters_& );
     void get( DictionaryDatum& ) const;
     void set( const DictionaryDatum&, const Buffers_&, Node* node );
   };
@@ -232,7 +252,7 @@ nest::multimeter::set_status( const DictionaryDatum& d )
 {
   // protect multimeter from being frozen
   bool freeze = false;
-  if ( updateValue< bool >( d, names::frozen, freeze ) && freeze )
+  if ( updateValue< bool >( d, names::frozen, freeze ) and freeze )
   {
     throw BadProperty( "multimeter cannot be frozen." );
   }
@@ -256,6 +276,18 @@ nest::multimeter::calibrate_time( const TimeConverter& tc )
   P_.interval_ = tc.from_old_tics( P_.interval_.get_tics() );
   P_.offset_ = tc.from_old_tics( P_.offset_.get_tics() );
 }
+
+
+//
+// Declaration of voltmeter subclass
+//
+
+class voltmeter : public multimeter
+{
+public:
+  voltmeter();
+  voltmeter( const voltmeter& );
+};
 
 } // namespace nest
 

@@ -35,29 +35,35 @@
 #include "event.h"
 #include "nest_types.h"
 #include "node.h"
-#include "normal_randomdev.h"
-#include "poisson_randomdev.h"
-#include "ring_buffer.h"
 #include "recordables_map.h"
+#include "ring_buffer.h"
 #include "universal_data_logger.h"
 
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup rate
+/* BeginUserDocs: neuron, rate
 
-Name: rate_transformer_node - Rate neuron that sums up incoming rates
-                and applies a nonlinearity specified via the template.
+Short description
++++++++++++++++++
 
-Description:
+Rate neuron that sums up incoming rates and applies a nonlinearity specified via the template
+
+Description
++++++++++++
+
+Base class for rate transformer model of the form
+
+.. math::
+
+   X_i(t) = \phi( \sum w_{ij} \cdot \psi( X_j(t-d_{ij}) ) )
 
 The rate transformer node simply applies the nonlinearity specified in the
 input-function of the template class to all incoming inputs. The boolean
-parameter linear_summation determines whether the input function is applied to
-the summed up incoming connections (True, default value) or to each input
-individually (False).
+parameter ``linear_summation`` determines whether the input function is applied to
+the summed up incoming connections (True, default value, input
+represents phi) or to each input individually (False, input represents psi).
+
 An important application is to provide the possibility to
 apply different nonlinearities to different incoming connections of the
 same rate neuron by connecting the sending rate neurons to the
@@ -66,29 +72,30 @@ receiving rate neuron instead of using a direct connection.
 Please note that for instantaneous rate connections the rate arrives
 one time step later at the receiving rate neurons as with a direct connection.
 
-Remarks:
+Weights on connections from and to the ``rate_transformer_node`` are
+handled as usual. Delays are honored on incoming and outgoing
+connections.
 
-- Weights on connections from and to the rate_transformer_node
-  are handled as usual.
-- Delays are honored on incoming and outgoing connections.
+Receives
+++++++++
 
-Receives: InstantaneousRateConnectionEvent, DelayedRateConnectionEvent
+InstantaneousRateConnectionEvent, DelayedRateConnectionEvent
 
-Sends: InstantaneousRateConnectionEvent, DelayedRateConnectionEvent
+Sends
++++++
 
-Parameters:
+InstantaneousRateConnectionEvent, DelayedRateConnectionEvent
 
-Only the parameter
-- linear_summation
-and the parameters from the class Nonlinearities can be set in the
+Parameters
+++++++++++
+
+Only the parameter ``linear_summation`` and the parameters from the class ``Nonlinearities`` can be set in the
 status dictionary.
 
-Author: Mario Senden, Jan Hahne, Jannis Schuecker
+EndUserDocs */
 
-FirstVersion: November 2017
-*/
 template < class TNonlinearities >
-class rate_transformer_node : public Archiving_Node
+class rate_transformer_node : public ArchivingNode
 {
 
 public:
@@ -107,41 +114,40 @@ public:
    */
 
   using Node::handle;
-  using Node::sends_secondary_event;
   using Node::handles_test_event;
+  using Node::sends_secondary_event;
 
-  void handle( InstantaneousRateConnectionEvent& );
-  void handle( DelayedRateConnectionEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( InstantaneousRateConnectionEvent& ) override;
+  void handle( DelayedRateConnectionEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( InstantaneousRateConnectionEvent&, rport );
-  port handles_test_event( DelayedRateConnectionEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( InstantaneousRateConnectionEvent&, rport ) override;
+  port handles_test_event( DelayedRateConnectionEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
   void
-  sends_secondary_event( InstantaneousRateConnectionEvent& )
+  sends_secondary_event( InstantaneousRateConnectionEvent& ) override
   {
   }
   void
-  sends_secondary_event( DelayedRateConnectionEvent& )
+  sends_secondary_event( DelayedRateConnectionEvent& ) override
   {
   }
 
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
   TNonlinearities nonlinearities_;
 
   bool update_( Time const&, const long, const long, const bool );
 
-  void update( Time const&, const long, const long );
-  bool wfr_update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
+  bool wfr_update( Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access the State_ class/member
   friend class RecordablesMap< rate_transformer_node< TNonlinearities > >;
@@ -288,7 +294,7 @@ rate_transformer_node< TNonlinearities >::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 
   nonlinearities_.get( d );
@@ -307,7 +313,7 @@ rate_transformer_node< TNonlinearities >::set_status( const DictionaryDatum& d )
   // write it back to (S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

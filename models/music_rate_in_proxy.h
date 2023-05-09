@@ -42,42 +42,53 @@
 // Includes from sli:
 #include "arraydatum.h"
 
-/*BeginDocumentation
+/* BeginUserDocs: device, rate, MUSIC
 
-Name: music_rate_in_proxy - A device which receives rate data from MUSIC.
+Short description
++++++++++++++++++
 
-Description:
-A music_rate_in_proxy can be used to receive rate data from
+A device which receives rate data from MUSIC
+
+Description
++++++++++++
+
+A ``music_rate_in_proxy`` can be used to receive rate data from
 remote MUSIC applications in NEST.
 
 It uses the MUSIC library to receive the data from other applications.
-The music_rate_in_proxy represents a complete port to which MUSIC can
-connect and send data. The music_rate_in_proxy can be queried using
-GetStatus to retrieve the messages.
+The ``music_rate_in_proxy`` represents a complete port to which MUSIC can
+connect and send data. The ``music_rate_in_proxy`` can be queried using
+``GetStatus`` to retrieve the messages.
 
-Parameters:
+Parameters
+++++++++++
+
 The following properties are available in the status dictionary:
 
-port_name      - The name of the MUSIC input port to listen to (default:
-                 rate_in)
-port_width     - The width of the MUSIC input port
-data           - The data received on the port as vector of doubles
-published      - A bool indicating if the port has been already published
-                 with MUSIC
+========== ===================================================================
+port_name  The name of the MUSIC input port to listen to (default: rate_in)
+port_width The width of the MUSIC input port
+data       The data received on the port as vector of doubles
+published  A bool indicating if the port has been already published with MUSIC
+========== ===================================================================
 
 The parameter port_name can be set using SetStatus.
 
-Examples:
+Examples
+++++++++
+
 /music_rate_in_proxy Create /mcip Set
 10 Simulate
 mcip GetStatus /data get /gaze_directions Set
 
-Author: Philipp Weidel, Jakob Jordan
-FirstVersion: June 2019
 Availability: Only when compiled with MUSIC
 
-SeeAlso: music_rate_out_proxy, music_cont_in_proxy
-*/
+See also
+++++++++
+
+music_rate_out_proxy, music_cont_in_proxy
+
+EndUserDocs*/
 
 namespace nest
 {
@@ -127,9 +138,8 @@ public:
   }
 
 private:
-  void init_state_( const Node& );
   void init_buffers_();
-  void calibrate();
+  void pre_run_hook();
 
   void update( Time const&, const long, const long );
 
@@ -142,11 +152,10 @@ private:
     std::string port_name_; //!< the name of MUSIC port to connect to
     int channel_;           //!< the MUSIC channel of the port
 
-    Parameters_();                     //!< Sets default parameter values
-    Parameters_( const Parameters_& ); //!< Recalibrate all times
+    Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;          //!< Store current values in dictionary
-    void set( const DictionaryDatum&, State_& ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, State_& ); //!< Set values from dictionary
   };
 
   // ------------------------------------------------------------

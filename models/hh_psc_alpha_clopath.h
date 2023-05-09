@@ -57,24 +57,23 @@ namespace nest
  */
 extern "C" int hh_psc_alpha_clopath_dynamics( double, const double*, double*, void* );
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup hh
-@ingroup psc
-@ingroup clopath_n
+/* BeginUserDocs: neuron, Hodgkin-Huxley, current-based, Clopath plasticity
 
-Name: hh_psc_alpha_clopath - Hodgkin-Huxley neuron model with support for the
-Clopath synapse.
+Short description
++++++++++++++++++
 
-Description:
+Hodgkin-Huxley neuron model with support for Clopath plasticity
 
-hh_psc_alpha_clopath is an implementation of a spiking neuron using the
+Description
++++++++++++
+
+``hh_psc_alpha_clopath`` is an implementation of a spiking neuron using the
 Hodgkin-Huxley formalism and that is capable of connecting to a Clopath
 synapse.
 
-(1) Post-synaptic currents
-Incoming spike events induce a post-synaptic change of current modelled
-by an alpha function. The alpha function is normalised such that an event of
+(1) Postsynaptic currents
+Incoming spike events induce a postsynaptic change of current modelled
+by an alpha function. The alpha function is normalized such that an event of
 weight 1.0 results in a peak current of 1 pA.
 
 
@@ -83,10 +82,13 @@ Spike detection is done by a combined threshold-and-local-maximum search: if
 there is a local maximum above a certain threshold of the membrane potential,
 it is considered a spike.
 
-Parameters:
+See also [1]_, [2]_, [3]_, [4]_, [5]_, [6]_.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
-\verbatim embed:rst
+
 =========== ======  ===================================================
 **Dynamic state variables**
 -----------------------------------------------------------------------
@@ -129,17 +131,17 @@ delay_u_bars  real    Delay with which u_bar_[plus/minus] are processed
 U_ref_squared real    Reference value for u_bar_bar_^2.
 ============= ======= =======================================================
 
-\endverbatim
+
+Problems/Todo
++++++++++++++
+
+- better spike detection
+- initial wavelet/spike at simulation onset
 
 
-Problems/Todo:
+References
+++++++++++
 
-better spike detection
-initial wavelet/spike at simulation onset
-
-References:
-
-\verbatim embed:rst
 .. [1] Gerstner W and Kistler WM (2002). Spiking neuron models: Single neurons,
        populations, plasticity. New York: Cambridge university press.
 .. [2] Dayan P and Abbott L (2001). Theoretical Neuroscience: Computational
@@ -159,24 +161,32 @@ References:
        Hodgkin-Huxley neuron on ModelDB:
        https://senselab.med.yale.edu/ModelDB/showmodel.cshtml?model=144566&file
        =%2fmodeldb_package%2fstdp_cc.mod
-\endverbatim
 
-Sends: SpikeEvent
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+Sends
++++++
 
-Author: Jonas Stapmanns, David Dahmen, Jan Hahne
-        (adapted from hh_psc_alpha by Schrader)
+SpikeEvent
 
-SeeAlso: hh_psc_alpha, clopath_synapse, aeif_psc_delta_clopath
-*/
-class hh_psc_alpha_clopath : public Clopath_Archiving_Node
+Receives
+++++++++
+
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+See also
+++++++++
+
+hh_psc_alpha, clopath_synapse, aeif_psc_delta_clopath
+
+EndUserDocs */
+
+class hh_psc_alpha_clopath : public ClopathArchivingNode
 {
 
 public:
   hh_psc_alpha_clopath();
   hh_psc_alpha_clopath( const hh_psc_alpha_clopath& );
-  ~hh_psc_alpha_clopath();
+  ~hh_psc_alpha_clopath() override;
 
   /**
    * Import sets of overloaded virtual functions.
@@ -186,24 +196,23 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void init_buffers_() override;
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   // END Boilerplate function declarations ----------------------------
 
@@ -222,25 +231,25 @@ private:
   //! Independent parameters
   struct Parameters_
   {
-    double t_ref_;      //!< refractory time in ms
-    double g_Na;        //!< Sodium Conductance in nS
-    double g_K;         //!< Potassium Conductance in nS
-    double g_L;         //!< Leak Conductance in nS
-    double C_m;         //!< Membrane Capacitance in pF
-    double E_Na;        //!< Sodium Reversal Potential in mV
-    double E_K;         //!< Potassium Reversal Potential in mV
-    double E_L;         //!< Leak reversal Potential (aka resting potential) in mV
-    double tau_synE;    //!< Synaptic Time Constant Excitatory Synapse in ms
-    double tau_synI;    //!< Synaptic Time Constant for Inhibitory Synapse in ms
-    double I_e;         //!< Constant Current in pA
-    double tau_plus;    //!< time constant of u_bar_plus in ms
-    double tau_minus;   //!< time constant of u_bar_minus in ms
-    double tau_bar_bar; //!< time constant of u_bar_bar in ms
+    double t_ref_;          //!< refractory time in ms
+    double g_Na;            //!< Sodium Conductance in nS
+    double g_K;             //!< Potassium Conductance in nS
+    double g_L;             //!< Leak Conductance in nS
+    double C_m;             //!< Membrane Capacitance in pF
+    double E_Na;            //!< Sodium Reversal Potential in mV
+    double E_K;             //!< Potassium Reversal Potential in mV
+    double E_L;             //!< Leak reversal Potential (aka resting potential) in mV
+    double tau_synE;        //!< Synaptic Time Constant Excitatory Synapse in ms
+    double tau_synI;        //!< Synaptic Time Constant for Inhibitory Synapse in ms
+    double I_e;             //!< Constant Current in pA
+    double tau_u_bar_plus;  //!< time constant of u_bar_plus in ms
+    double tau_u_bar_minus; //!< time constant of u_bar_minus in ms
+    double tau_u_bar_bar;   //!< time constant of u_bar_bar in ms
 
     Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;             //!< Store current values in dictionary
-    void set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
 public:
@@ -248,8 +257,7 @@ public:
 
   /**
    * State variables of the model.
-   * @note Copy constructor and assignment operator required because
-   *       of C-style array.
+   * @note Copy constructor required because of C-style array.
    */
   struct State_
   {
@@ -282,6 +290,7 @@ public:
 
     State_( const Parameters_& ); //!< Default initialization
     State_( const State_& );
+
     State_& operator=( const State_& );
 
     void get( DictionaryDatum& ) const;
@@ -296,8 +305,8 @@ private:
    */
   struct Buffers_
   {
-    Buffers_( hh_psc_alpha_clopath& );                  //!<Sets buffer pointers to 0
-    Buffers_( const Buffers_&, hh_psc_alpha_clopath& ); //!<Sets buffer pointers to 0
+    Buffers_( hh_psc_alpha_clopath& );                  //!< Sets buffer pointers to 0
+    Buffers_( const Buffers_&, hh_psc_alpha_clopath& ); //!< Sets buffer pointers to 0
 
     //! Logger for all analog data
     UniversalDataLogger< hh_psc_alpha_clopath > logger_;
@@ -313,7 +322,7 @@ private:
     gsl_odeiv_evolve* e_;  //!< evolution function
     gsl_odeiv_system sys_; //!< struct describing system
 
-    // Since IntergrationStep_ is initialized with step_, and the resolution
+    // Since IntegrationStep_ is initialized with step_, and the resolution
     // cannot change after nodes have been created, it is safe to place both
     // here.
     double step_;            //!< step size in ms
@@ -412,7 +421,7 @@ hh_psc_alpha_clopath::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Clopath_Archiving_Node::get_status( d );
+  ClopathArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -429,7 +438,7 @@ hh_psc_alpha_clopath::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Clopath_Archiving_Node::set_status( d );
+  ClopathArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

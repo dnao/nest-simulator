@@ -35,67 +35,87 @@
 namespace nest
 {
 
-/** @BeginDocumentation
+/* BeginUserDocs: neuron, integrate-and-fire, current-based
 
-@ingroup Neurons
-@ingroup iaf
-@ingroup psc
+Short description
++++++++++++++++++
 
-Name: iaf_psc_exp - Leaky integrate-and-fire neuron model with exponential
-                   PSCs.
+Leaky integrate-and-fire neuron model with exponential PSCs
 
-Description:
+Description
++++++++++++
 
-iaf_psc_exp is an implementation of a leaky integrate-and-fire model
-with exponential shaped postsynaptic currents (PSCs) according to [1].
+``iaf_psc_exp`` is an implementation of a leaky integrate-and-fire model
+with exponential shaped postsynaptic currents (PSCs) according to [1]_.
 Thus, postsynaptic currents have an infinitely short rise time.
 
-The threshold crossing is followed by an absolute refractory period (t_ref)
+The threshold crossing is followed by an absolute refractory period (``t_ref``)
 during which the membrane potential is clamped to the resting potential
 and spiking is prohibited.
 
-The linear subthresold dynamics is integrated by the Exact
-Integration scheme [2]. The neuron dynamics is solved on the time
-grid given by the computation step size. Incoming as well as emitted
-spikes are forced to that grid.
+The neuron dynamics is solved on the time grid given by the computation step
+size. Incoming as well as emitted spikes are forced to that grid.
+
+The linear subthreshold dynamics is integrated by the Exact
+Integration scheme [2]_, which is more precise, but different from the
+implementation in [1]_, which uses the forward Euler integration scheme.
+This precludes an exact numerical reproduction of the results from [1]_.
 
 An additional state variable and the corresponding differential
 equation represents a piecewise constant external current.
 
 The general framework for the consistent formulation of systems with
 neuron like dynamics interacting by point events is described in
-[2]. A flow chart can be found in [3].
+[2]_. A flow chart can be found in [3]_.
 
 Spiking in this model can be either deterministic (delta=0) or stochastic (delta
 > 0). In the stochastic case this model implements a type of spike response
-model with escape noise [4, 5].
+model with escape noise [4]_.
 
-Remarks:
+.. note::
 
-The present implementation uses individual variables for the
-components of the state vector and the non-zero matrix elements of
-the propagator.  Because the propagator is a lower triangular matrix
-no full matrix multiplication needs to be carried out and the
-computation can be done "in place" i.e. no temporary state vector
-object is required.
 
-The template support of recent C++ compilers enables a more succinct
-formulation without loss of runtime performance already at minimal
-optimization levels. A future version of iaf_psc_exp will probably
-address the problem of efficient usage of appropriate vector and
-matrix objects.
+  If ``tau_m`` is very close to ``tau_syn_ex`` or ``tau_syn_in``, the model
+  will numerically behave as if ``tau_m`` is equal to ``tau_syn_ex`` or
+  ``tau_syn_in``, respectively, to avoid numerical instabilities.
 
-Parameters:
+  For implementation details see the
+  `IAF_neurons_singularity <../model_details/IAF_neurons_singularity.ipynb>`_ notebook.
+
+``iaf_psc_exp`` can handle current input in two ways:
+
+1. Current input through ``receptor_type`` 0 is handled as a stepwise constant
+   current input as in other iaf models, that is, this current directly enters the
+   membrane potential equation.
+2. In contrast, current input through ``receptor_type`` 1 is filtered through an
+   exponential kernel with the time constant of the excitatory synapse,
+   ``tau_syn_ex``.
+
+   For an example application, see [4]_.
+
+   **Warning:** this current input is added to the state variable
+   ``i_syn_ex_``. If this variable is being recorded, its numerical value
+   will thus not correspond to the excitatory synaptic input current, but to
+   the sum of excitatory synaptic input current and the contribution from
+   receptor type 1 currents.
+
+For conversion between postsynaptic potentials (PSPs) and PSCs,
+please refer to the ``postsynaptic_potential_to_current`` function in
+:doc:`PyNEST Microcircuit: Helper Functions <../auto_examples/Potjans_2014/helpers>`.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
 
-\verbatim embed:rst
 ===========  =======  ========================================================
  E_L          mV      Resting membrane potential
  C_m          pF      Capacity of the membrane
  tau_m        ms      Membrane time constant
- tau_syn_ex   ms      Time constant of postsynaptic excitatory currents
- tau_syn_in   ms      Time constant of postsynaptic inhibitory currents
+ tau_syn_ex   ms      Exponential decay time constant of excitatory synaptic
+                      current kernel
+ tau_syn_in   ms      Exponential decay time constant of inhibitory synaptic
+                      current kernel
  t_ref        ms      Duration of refractory period (V_m = V_reset)
  V_m          mV      Membrane potential in mV
  V_th         mV      Spike threshold in mV
@@ -103,28 +123,10 @@ The following parameters can be set in the status dictionary.
  I_e          pA      Constant input current
  t_spike      ms      Point in time of last spike
 ===========  =======  ========================================================
-\endverbatim
 
+References
+++++++++++
 
-Remarks:
-
-If tau_m is very close to tau_syn_ex or tau_syn_in, the model
-will numerically behave as if tau_m is equal to tau_syn_ex or
-tau_syn_in, respectively, to avoid numerical instabilities.
-For details, please see IAF_neurons_singularity.ipynb in the
-NEST source code (docs/model_details).
-
-iaf_psc_exp can handle current input in two ways: Current input
-through receptor_type 0 are handled as stepwise constant current
-input as in other iaf models, i.e., this current directly enters
-the membrane potential equation. Current input through
-receptor_type 1, in contrast, is filtered through an exponential
-kernel with the time constant of the excitatory synapse,
-tau_syn_ex. For an example application, see [6].
-
-References:
-
-\verbatim embed:rst
 .. [1] Tsodyks M, Uziel A, Markram H (2000). Synchrony generation in recurrent
        networks with frequency-dependent synapses. The Journal of Neuroscience,
        20,RC50:1-5. URL: https://infoscience.epfl.ch/record/183402
@@ -139,21 +141,40 @@ References:
 .. [4] Schuecker J, Diesmann M, Helias M (2015). Modulated escape from a
        metastable state driven by colored noise. Physical Review E 92:052119
        DOI: https://doi.org/10.1103/PhysRevE.92.052119
-\endverbatim
-=======
 
+Sends
++++++
 
-Sends: SpikeEvent
+SpikeEvent
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+Receives
+++++++++
 
-SeeAlso: iaf_psc_exp_ps
+SpikeEvent, CurrentEvent, DataLoggingRequest
 
-FirstVersion: March 2006
+See also
+++++++++
 
-Author: Moritz Helias
-*/
-class iaf_psc_exp : public Archiving_Node
+iaf_cond_exp, iaf_psc_exp_ps
+
+EndUserDocs */
+
+/**
+ * The present implementation uses individual variables for the
+ * components of the state vector and the non-zero matrix elements of
+ * the propagator. Because the propagator is a lower triangular matrix,
+ * no full matrix multiplication needs to be carried out and the
+ * computation can be done "in place", i.e. no temporary state vector
+ * object is required.
+ *
+ * The template support of recent C++ compilers enables a more succinct
+ * formulation without loss of runtime performance already at minimal
+ * optimization levels. A future version of iaf_psc_exp will probably
+ * address the problem of efficient usage of appropriate vector and
+ * matrix objects.
+ */
+
+class iaf_psc_exp : public ArchivingNode
 {
 
 public:
@@ -168,25 +189,24 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
-  void update( const Time&, const long, const long );
+  void update( const Time&, const long, const long ) override;
 
   // intensity function
   double phi_() const;
@@ -254,15 +274,13 @@ private:
   struct State_
   {
     // state variables
-    //! synaptic stepwise constant input current, variable 0
-    double i_0_;
-    double i_1_;      //!< presynaptic stepwise constant input current
-    double i_syn_ex_; //!< postsynaptic current for exc. inputs, variable 1
-    double i_syn_in_; //!< postsynaptic current for inh. inputs, variable 1
-    double V_m_;      //!< membrane potential, variable 2
-
-    //! absolute refractory counter (no membrane potential propagation)
-    int r_ref_;
+    double i_0_;      //!< Stepwise constant input current
+    double i_1_;      //!< Current input that is filtered through the excitatory synapse exponential kernel
+    double i_syn_ex_; //!< Postsynaptic current for excitatory inputs (includes contribution from current input on
+                      //!< receptor type 1)
+    double i_syn_in_; //!< Postsynaptic current for inhibitory inputs
+    double V_m_;      //!< Membrane potential
+    int r_ref_;       //!< Absolute refractory counter (no membrane potential propagation)
 
     State_(); //!< Default initialization
 
@@ -286,10 +304,18 @@ private:
     Buffers_( iaf_psc_exp& );
     Buffers_( const Buffers_&, iaf_psc_exp& );
 
+    //! Indices for access to different channels of input_buffer_
+    enum
+    {
+      SYN_IN = 0,
+      SYN_EX,
+      I0,
+      I1,
+      NUM_INPUT_CHANNELS
+    };
+
     /** buffers and sums up incoming spikes/currents */
-    RingBuffer spikes_ex_;
-    RingBuffer spikes_in_;
-    std::vector< RingBuffer > currents_;
+    MultiChannelInputBuffer< NUM_INPUT_CHANNELS > input_buffer_;
 
     //! Logger for all analog data
     UniversalDataLogger< iaf_psc_exp > logger_;
@@ -303,7 +329,7 @@ private:
   struct Variables_
   {
     /** Amplitude of the synaptic current.
-        This value is chosen such that a post-synaptic potential with
+        This value is chosen such that a postsynaptic potential with
         weight one has an amplitude of 1 mV.
         @note mog - I assume this, not checked.
     */
@@ -322,7 +348,7 @@ private:
 
     int RefractoryCounts_;
 
-    librandom::RngPtr rng_; //!< random number generator of my own thread
+    RngPtr rng_; //!< random number generator of my own thread
   };
 
   // Access functions for UniversalDataLogger -------------------------------
@@ -332,18 +358,6 @@ private:
   get_V_m_() const
   {
     return S_.V_m_ + P_.E_L_;
-  }
-
-  inline double
-  get_weighted_spikes_ex_() const
-  {
-    return V_.weighted_spikes_ex_;
-  }
-
-  inline double
-  get_weighted_spikes_in_() const
-  {
-    return V_.weighted_spikes_in_;
   }
 
   inline double
@@ -428,7 +442,7 @@ iaf_psc_exp::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d, P_ );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -445,7 +459,7 @@ iaf_psc_exp::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

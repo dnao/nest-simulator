@@ -41,43 +41,46 @@
 #include "nest_types.h"
 #include "node.h"
 
-/* BeginDocumentation
+/* BeginUserDocs: device, rate, MUSIC
 
-Name: music_rate_out_proxy - Device to forward rates to remote applications
-                              using MUSIC.
+Short description
++++++++++++++++++
 
-Description:
-A music_rate_out_proxy is used to send rates to a remote application that
+Device to forward rates to remote applications using MUSIC
+
+Description
++++++++++++
+
+A ``music_rate_out_proxy`` is used to send rates to a remote application that
 also uses MUSIC.
 
-The music_rate_out_proxy represents a complete MUSIC rate output
+The ``music_rate_out_proxy`` represents a complete MUSIC rate output
 port. The channel on the port to which a source node forwards its
 events is determined during connection setup by using the parameter
-music_channel of the connection. The name of the port is set via
-SetStatus (see Parameters section below).
+``music_channel`` of the connection. The name of the port is set via
+``SetStatus`` (see Parameters section below).
 
-Parameters:
+Parameters
+++++++++++
+
 The following properties are available in the status dictionary:
 
-port_name      - The name of the MUSIC output_port to forward events to
-                 (default: rate_out)
-port_width     - The width of the MUSIC input port
-published      - A bool indicating if the port has been already published
-                 with MUSIC
+port_name    - The name of the MUSIC output_port to forward events to (default: `rate_out`)
 
-The parameter port_name can be set using SetStatus.
+port_width   - The width of the MUSIC input port
 
-Examples:
-/iaf_psc_alpha Create /n Set
-/music_rate_out_proxy Create /meop Set
-n meop << /music_channel 2 >> Connect
+published    - A bool indicating if the port has been already published with MUSIC
 
-Author: Philipp Weidel, Jakob Jordan
-FirstVersion: June 2019
+The parameter port_name can be set using ``SetStatus``.
+
 Availability: Only when compiled with MUSIC
 
-SeeAlso: music_rate_in_proxy, music_cont_out_proxy
-*/
+See also
+++++++++
+
+music_rate_in_proxy, music_cont_out_proxy
+
+EndUserDocs */
 
 namespace nest
 {
@@ -121,9 +124,8 @@ public:
   void set_status( const DictionaryDatum& );
 
 private:
-  void init_state_( Node const& );
   void init_buffers_();
-  void calibrate();
+  void pre_run_hook();
 
   void
   update( Time const&, const long, const long )
@@ -138,11 +140,10 @@ private:
   {
     std::string port_name_; //!< the name of MUSIC port to connect to
 
-    Parameters_();                     //!< Sets default parameter values
-    Parameters_( const Parameters_& ); //!< Recalibrate all times
+    Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const;          //!< Store current values in dictionary
-    void set( const DictionaryDatum&, State_& ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, State_& ); //!< Set values from dictionary
   };
 
   // ------------------------------------------------------------
@@ -205,6 +206,6 @@ music_rate_out_proxy::handles_test_event( InstantaneousRateConnectionEvent&, rpo
 
 } // namespace
 
-#endif /* #ifndef MUSIC_RATE_OUT_PROXY_H */
+#endif /* HAVE_MUSIC */
 
 #endif

@@ -35,69 +35,79 @@
 #include "event.h"
 #include "nest_types.h"
 #include "node.h"
-#include "normal_randomdev.h"
-#include "poisson_randomdev.h"
-#include "ring_buffer.h"
+#include "random_generators.h"
 #include "recordables_map.h"
+#include "ring_buffer.h"
 #include "universal_data_logger.h"
 
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup rate
+/* BeginUserDocs: neuron, rate
 
-Name: rate_neuron_opn - Base class for rate model with output noise.
+Short description
++++++++++++++++++
 
-Description:
+Base class for rate model with output noise
+
+Description
++++++++++++
 
 Base class for rate model with output noise of the form
-@f[
-\tau dX_i(t) / dt = - X_i(t) + \mu + \phi( \sum w_{ij} \cdot
+
+.. math::
+
+ \tau dX_i(t) / dt = - X_i(t) + \mu + \phi( \sum w_{ij} \cdot
                      \psi( X_j(t-d_{ij}) + \sqrt{\tau} \cdot
                      \sigma \cdot \xi_j(t) ) )
-@f]
+
 or
-@f[
-\tau dX_i(t) / dt = - X_i(t) + \mu
+
+.. math::
+
+ \tau dX_i(t) / dt = - X_i(t) + \mu
                      + \text{mult_coupling_ex}( X_i(t) ) \cdot \\
                      \phi( \sum w^{ > 0 }_{ij} \cdot \psi( X_j(t-d_{ij}) \\
                      + \sqrt{\tau} \cdot \sigma \cdot \xi_j(t) ) ) \\
                      + \text{mult_coupling_in}( X_i(t) ) \cdot \\
                      \phi( \sum w^{ < 0 }_{ij} \cdot \psi( X_j(t-d_{ij}) \\
                      + \sqrt{\tau} \cdot \sigma \cdot \xi_j(t) ) )
-@f]
 
-Here \f$ xi_j(t) \f$ denotes a Gaussian white noise.
+
+Here :math:`xi_j(t)` denotes a Gaussian white noise.
 
 This template class needs to be instantiated with a class
 containing the following functions:
- - input (nonlinearity that is applied to the input, either psi or phi)
- - mult_coupling_ex (factor of multiplicative coupling for excitatory input)
- - mult_coupling_in (factor of multiplicative coupling for inhibitory input)
 
-The boolean parameter linear_summation determines whether the input function
+- ``input`` (nonlinearity that is applied to the input, either psi or phi)
+- ``mult_coupling_ex`` (factor of multiplicative coupling for excitatory input)
+- ``mult_coupling_in`` (factor of multiplicative coupling for inhibitory input)
+
+The boolean parameter ``linear_summation`` determines whether the input function
 is applied to the summed up incoming connections (True, default value, input
 represents phi) or to each input individually (False, input represents psi).
 In case of multiplicative coupling the nonlinearity is applied separately
-to the summed excitatory and inhibitory inputs if linear_summation=True.
+to the summed excitatory and inhibitory inputs if ``linear_summation=True``.
 
-References:
+See also  [1]_.
 
-\verbatim embed:rst
+References
+++++++++++
+
 .. [1] Hahne J, Dahmen D, Schuecker J, Frommer A, Bolten M, Helias M,
        Diesmann M (2017). Integration of continuous-time dynamics in a
        spiking neural network simulator. Frontiers in Neuroinformatics, 11:34.
        DOI:  https://doi.org./10.3389/fninf.2017.00034
-\endverbatim
 
-Author: David Dahmen, Jan Hahne, Jannis Schuecker
+See also
+++++++++
 
-SeeAlso: lin_rate, tanh_rate, threshold_lin_rate
- */
+lin_rate, tanh_rate, threshold_lin_rate
+
+EndUserDocs  */
+
 template < class TNonlinearities >
-class rate_neuron_opn : public Archiving_Node
+class rate_neuron_opn : public ArchivingNode
 {
 
 public:
@@ -112,33 +122,32 @@ public:
    * Hiding
    */
   using Node::handle;
-  using Node::sends_secondary_event;
   using Node::handles_test_event;
+  using Node::sends_secondary_event;
 
-  void handle( InstantaneousRateConnectionEvent& );
-  void handle( DelayedRateConnectionEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( InstantaneousRateConnectionEvent& ) override;
+  void handle( DelayedRateConnectionEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( InstantaneousRateConnectionEvent&, rport );
-  port handles_test_event( DelayedRateConnectionEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( InstantaneousRateConnectionEvent&, rport ) override;
+  port handles_test_event( DelayedRateConnectionEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
   void
-  sends_secondary_event( InstantaneousRateConnectionEvent& )
+  sends_secondary_event( InstantaneousRateConnectionEvent& ) override
   {
   }
   void
-  sends_secondary_event( DelayedRateConnectionEvent& )
+  sends_secondary_event( DelayedRateConnectionEvent& ) override
   {
   }
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
   TNonlinearities nonlinearities_;
 
@@ -147,8 +156,8 @@ private:
    */
   bool update_( Time const&, const long, const long, const bool );
 
-  void update( Time const&, const long, const long );
-  bool wfr_update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
+  bool wfr_update( Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access the State_ class/member
   friend class RecordablesMap< rate_neuron_opn< TNonlinearities > >;
@@ -230,9 +239,7 @@ private:
     // by RateConnectionInstantaneous
     std::vector< double > last_y_values;  //!< remembers y_values from last wfr_update
     std::vector< double > random_numbers; //!< remembers the random_numbers in
-    // order to apply the same random
-    // numbers in each iteration when wfr
-    // is used
+    // order to apply the same random numbers in each iteration when wfr is used
     UniversalDataLogger< rate_neuron_opn > logger_; //!< Logger for all analog data
   };
 
@@ -243,7 +250,6 @@ private:
    */
   struct Variables_
   {
-
     // propagators
     double P1_;
     double P2_;
@@ -251,9 +257,7 @@ private:
     // factor accounting for piecewise constant implementation of noise
     double output_noise_factor_;
 
-    librandom::RngPtr rng_;
-    librandom::PoissonRandomDev poisson_dev_; //!< random deviate generator
-    librandom::NormalRandomDev normal_dev_;   //!< random deviate generator
+    normal_distribution normal_dist_; //!< normal distribution
   };
 
   //! Read out the rate
@@ -346,7 +350,7 @@ rate_neuron_opn< TNonlinearities >::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 
   nonlinearities_.get( d );
@@ -365,7 +369,7 @@ rate_neuron_opn< TNonlinearities >::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;

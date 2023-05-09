@@ -28,64 +28,71 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Synapses
-@ingroup inst_rate
+/* BeginUserDocs: synapse, instantaneous rate
 
-Name: diffusion_connection - Synapse type for instantaneous rate connections
-between neurons of type siegert_neuron.
+Short description
++++++++++++++++++
 
+Synapse type for instantaneous rate connections between neurons of type siegert_neuron
 
-Description:
+Description
++++++++++++
 
-diffusion_connection is a connector to create
-instantaneous connections between neurons of type siegert_neuron. The
-connection type is identical to type rate_connection_instantaneous
+``diffusion_connection`` is a connector to create
+instantaneous connections between neurons of type ``siegert_neuron``. The
+connection type is identical to type ``rate_connection_instantaneous``
 for instantaneous rate connections except for the two parameters
-drift_factor and diffusion_factor substituting the parameter weight.
+``drift_factor`` and ``diffusion_factor`` substituting the parameter weight.
 
 These two factor origin from the mean-field reduction of networks of
 leaky-integrate-and-fire neurons. In this reduction the input to the
 neurons is characterized by its mean and its variance. The mean is
 obtained by a sum over presynaptic activities (e.g as in eq.28 in
-[1]), where each term of the sum consists of the presynaptic activity
-multiplied with the drift_factor. Similarly, the variance is obtained
-by a sum over presynaptic activities (e.g as in eq.29 in [1]), where
+[1]_), where each term of the sum consists of the presynaptic activity
+multiplied with the ``drift_factor``. Similarly, the variance is obtained
+by a sum over presynaptic activities (e.g as in eq.29 in [1]_), where
 each term of the sum consists of the presynaptic activity multiplied
-with the diffusion_factor. Note that in general the drift and
+with the ``diffusion_factor``. Note that in general the drift and
 diffusion factors might differ from the ones given in eq. 28 and 29.,
 for example in case of a reduction on the single neuron level or in
-case of distributed in-degrees (see discussion in chapter 5.2 of [1])
+case of distributed in-degrees (see discussion in chapter 5.2 of [1]_)
 
 The values of the parameters delay and weight are ignored for
 connections of this type.
 
-Transmits: DiffusionConnectionEvent
+Transmits
++++++++++
 
-References:
+DiffusionConnectionEvent
 
-\verbatim embed:rst
+References
+++++++++++
+
+
 .. [1] Hahne J, Dahmen D, Schuecker J, Frommer A,
        Bolten M, Helias M, Diesmann, M. (2017).
        Integration of continuous-time dynamics in a
        spiking neural network simulator.
        Frontiers in Neuroinformatics, 11:34.
        DOI: https://doi.org/10.3389/fninf.2017.00034
-\endverbatim
 
-Author: David Dahmen, Jan Hahne, Jannis Schuecker
 
-SeeAlso: siegert_neuron, rate_connection_instantaneous
-*/
+See also
+++++++++
+
+siegert_neuron, rate_connection_instantaneous
+
+EndUserDocs */
+
 template < typename targetidentifierT >
 class DiffusionConnection : public Connection< targetidentifierT >
 {
-
 public:
   // this line determines which common properties to use
   typedef CommonSynapseProperties CommonPropertiesType;
   typedef Connection< targetidentifierT > ConnectionBase;
-  typedef DiffusionConnectionEvent EventType;
+
+  static constexpr ConnectionModelProperties properties = ConnectionModelProperties::SUPPORTS_WFR;
 
   /**
    * Default Constructor.
@@ -97,6 +104,8 @@ public:
     , diffusion_factor_( 1.0 )
   {
   }
+
+  SecondaryEvent* get_secondary_event();
 
   // Explicitly declare all methods inherited from the dependent base
   // ConnectionBase.
@@ -111,7 +120,7 @@ public:
   void
   check_connection( Node& s, Node& t, rport receptor_type, const CommonPropertiesType& )
   {
-    EventType ge;
+    DiffusionConnectionEvent ge;
 
     s.sends_secondary_event( ge );
     ge.set_sender( s );
@@ -159,6 +168,9 @@ private:
 };
 
 template < typename targetidentifierT >
+constexpr ConnectionModelProperties DiffusionConnection< targetidentifierT >::properties;
+
+template < typename targetidentifierT >
 void
 DiffusionConnection< targetidentifierT >::get_status( DictionaryDatum& d ) const
 {
@@ -189,6 +201,14 @@ DiffusionConnection< targetidentifierT >::set_status( const DictionaryDatum& d, 
   ConnectionBase::set_status( d, cm );
   updateValue< double >( d, names::drift_factor, drift_factor_ );
   updateValue< double >( d, names::diffusion_factor, diffusion_factor_ );
+}
+
+
+template < typename targetidentifierT >
+SecondaryEvent*
+DiffusionConnection< targetidentifierT >::get_secondary_event()
+{
+  return new DiffusionConnectionEvent();
 }
 
 } // namespace

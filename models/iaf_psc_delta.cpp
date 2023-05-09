@@ -37,10 +37,7 @@
 #include "universal_data_logger_impl.h"
 
 // Includes from sli:
-#include "dict.h"
 #include "dictutils.h"
-#include "doubledatum.h"
-#include "integerdatum.h"
 
 namespace nest
 {
@@ -57,7 +54,7 @@ template <>
 void
 RecordablesMap< iaf_psc_delta >::create()
 {
-  // use standard names whereever you can for consistency!
+  // use standard names wherever you can for consistency!
   insert_( names::V_m, &iaf_psc_delta::get_V_m_ );
 }
 
@@ -200,7 +197,7 @@ nest::iaf_psc_delta::Buffers_::Buffers_( const Buffers_&, iaf_psc_delta& n )
  * ---------------------------------------------------------------- */
 
 nest::iaf_psc_delta::iaf_psc_delta()
-  : Archiving_Node()
+  : ArchivingNode()
   , P_()
   , S_()
   , B_( *this )
@@ -209,7 +206,7 @@ nest::iaf_psc_delta::iaf_psc_delta()
 }
 
 nest::iaf_psc_delta::iaf_psc_delta( const iaf_psc_delta& n )
-  : Archiving_Node( n )
+  : ArchivingNode( n )
   , P_( n.P_ )
   , S_( n.S_ )
   , B_( n.B_, *this )
@@ -221,23 +218,16 @@ nest::iaf_psc_delta::iaf_psc_delta( const iaf_psc_delta& n )
  * ---------------------------------------------------------------- */
 
 void
-nest::iaf_psc_delta::init_state_( const Node& proto )
-{
-  const iaf_psc_delta& pr = downcast< iaf_psc_delta >( proto );
-  S_ = pr.S_;
-}
-
-void
 nest::iaf_psc_delta::init_buffers_()
 {
   B_.spikes_.clear();   // includes resize
   B_.currents_.clear(); // includes resize
   B_.logger_.reset();   // includes resize
-  Archiving_Node::clear_history();
+  ArchivingNode::clear_history();
 }
 
 void
-nest::iaf_psc_delta::calibrate()
+nest::iaf_psc_delta::pre_run_hook()
 {
   B_.logger_.init();
 
@@ -277,9 +267,6 @@ nest::iaf_psc_delta::calibrate()
 void
 nest::iaf_psc_delta::update( Time const& origin, const long from, const long to )
 {
-  assert( to >= 0 && ( delay ) from < kernel().connection_manager.get_min_delay() );
-  assert( from < to );
-
   const double h = Time::get_resolution().get_ms();
   for ( long lag = from; lag < to; ++lag )
   {
@@ -290,7 +277,7 @@ nest::iaf_psc_delta::update( Time const& origin, const long from, const long to 
 
       // if we have accumulated spikes from refractory period,
       // add and reset accumulator
-      if ( P_.with_refr_input_ && S_.refr_spikes_buffer_ != 0.0 )
+      if ( P_.with_refr_input_ and S_.refr_spikes_buffer_ != 0.0 )
       {
         S_.y3_ += S_.refr_spikes_buffer_;
         S_.refr_spikes_buffer_ = 0.0;

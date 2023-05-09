@@ -19,8 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with NEST.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Population of GIF neuron model with oscillatory behavior
--------------------------------------------------------------
+"""
+Population of GIF neuron model with oscillatory behavior
+--------------------------------------------------------
 
 This script simulates a population of generalized integrate-and-fire (GIF)
 model neurons driven by noise from a group of Poisson generators.
@@ -31,8 +32,10 @@ elements (stc and sfa).
 
 Population dynamics are visualized by raster plot and as average firing rate.
 
+See [1]_ and [2]_ for details.
+
 References
-~~~~~~~~~~~
+~~~~~~~~~~
 
 .. [1] Schwalger T, Degert M, Gerstner W (2017). Towards a theory of cortical columns: From spiking
        neurons to interacting neural populations of finite size. PLoS Comput Biol.
@@ -98,21 +101,21 @@ w_noise = 20.0  # synaptic weights from Poisson to population neurons (pA)
 # Configuration of the simulation kernel with the previously defined time
 # resolution.
 
-nest.SetKernelStatus({"resolution": dt})
+nest.resolution = dt
 
 ###############################################################################
 # Building a population of GIF neurons, a group of Poisson neurons and a
-# spike detector device for capturing spike times of the population.
+# spike recorder device for capturing spike times of the population.
 
 population = nest.Create("gif_psc_exp", N_ex, params=neuron_params)
 
 noise = nest.Create("poisson_generator", N_noise, params={'rate': rate_noise})
 
-spike_det = nest.Create("spike_detector")
+spike_det = nest.Create("spike_recorder")
 
 ###############################################################################
 # Build connections inside the population of GIF neurons population, between
-# Poisson group and the population, and also connecting spike detector to
+# Poisson group and the population, and also connecting spike recorder to
 # the population.
 
 nest.Connect(
@@ -135,4 +138,4 @@ nest.Simulate(simtime)
 
 nest.raster_plot.from_device(spike_det, hist=True)
 plt.title('Population dynamics')
-nest.raster_plot.show()
+plt.show()

@@ -41,8 +41,8 @@ long
 getValue< long >( const Token& t )
 {
   const IntegerDatum* id = dynamic_cast< const IntegerDatum* >( t.datum() );
-  if ( id == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not id )
+  { // We have to create a Datum object to get the name...
     IntegerDatum const d;
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
@@ -53,8 +53,8 @@ void
 setValue< long >( const Token& t, long const& value )
 {
   IntegerDatum* id = dynamic_cast< IntegerDatum* >( t.datum() );
-  if ( id == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not id )
+  { // We have to create a Datum object to get the name...
     IntegerDatum const d;
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
@@ -73,50 +73,34 @@ template <>
 double
 getValue< double >( const Token& t )
 {
-  DoubleDatum* id = dynamic_cast< DoubleDatum* >( t.datum() );
-  if ( id == NULL )
-  { // we have to create a Datum object to get the name...
-    DoubleDatum const d;
-    throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
+
+  DoubleDatum* dd = dynamic_cast< DoubleDatum* >( t.datum() );
+  if ( dd )
+  {
+    return dd->get();
   }
-  return id->get();
+  IntegerDatum* id = dynamic_cast< IntegerDatum* >( t.datum() );
+  if ( id )
+  {
+    return static_cast< double >( id->get() );
+  }
+
+  // We have to create a Datum object to get the name...
+  DoubleDatum const d;
+  throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
 }
+
 template <>
 void
 setValue< double >( const Token& t, double const& value )
 {
   DoubleDatum* id = dynamic_cast< DoubleDatum* >( t.datum() );
-  if ( id == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not id )
+  { // We have to create a Datum object to get the name...
     DoubleDatum const d;
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
   ( *id ) = value;
-}
-template <>
-float
-getValue< float >( const Token& t )
-{
-  DoubleDatum* id = dynamic_cast< DoubleDatum* >( t.datum() );
-  if ( id == NULL )
-  { // we have to create a Datum object to get the name...
-    DoubleDatum const d;
-    throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
-  }
-  return ( float ) id->get();
-}
-
-template <>
-void
-setValue< float >( const Token& t, float const& value )
-{
-  DoubleDatum* id = dynamic_cast< DoubleDatum* >( t.datum() );
-  if ( id == NULL )
-  { // we have to create a Datum object to get the name...
-    DoubleDatum const d;
-    throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
-  }
-  ( *id ) = ( double ) value;
 }
 
 template <>
@@ -131,26 +115,26 @@ bool
 getValue< bool >( const Token& t )
 {
   BoolDatum* bd = dynamic_cast< BoolDatum* >( t.datum() );
-  if ( bd == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not bd )
+  { // We have to create a Datum object to get the name...
     BoolDatum const d( false );
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
   return static_cast< bool >( *bd );
-  // we should have used i->true_name, bit we don't know the interpreter here.
+  // We should have used i->true_name, bit we don't know the interpreter here.
 }
 template <>
 void
 setValue< bool >( const Token& t, bool const& value )
 {
   BoolDatum* bd = dynamic_cast< BoolDatum* >( t.datum() );
-  if ( bd == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not bd )
+  { // We have to create a Datum object to get the name...
     BoolDatum const d( false );
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
   *bd = BoolDatum( value );
-  // we should have used i->true_name, bit we don't know the interpreter here.
+  // We should have used i->true_name, bit we don't know the interpreter here.
 }
 
 
@@ -159,7 +143,7 @@ Token
 newToken< bool >( bool const& value )
 {
   return Token( new BoolDatum( value ) );
-  // we should have used i->true_name, bit we don't know the interpreter here.
+  // We should have used i->true_name, bit we don't know the interpreter here.
 }
 
 
@@ -171,7 +155,7 @@ getValue< std::string >( const Token& t )
 {
   // If it is a StringDatum, it can be casted to a string:
   std::string* s = dynamic_cast< std::string* >( t.datum() );
-  if ( s != NULL )
+  if ( s )
   {
     return *s;
   }
@@ -180,14 +164,14 @@ getValue< std::string >( const Token& t )
     // If it is a NameDatum, LiteralDatum or SymbolDatum,
     // (or even a BoolDatum!) it can be casted to a Name:
     Name* n = dynamic_cast< Name* >( t.datum() );
-    if ( n != NULL )
+    if ( n )
     {
       return n->toString();
     }
     else
     {
       // The given token can never yield a string!
-      // we have to create Datum objects to get the expected names...
+      // We have to create Datum objects to get the expected names...
       StringDatum const d1;
       NameDatum const d2( "dummy" );
       LiteralDatum const d3( "dummy" );
@@ -204,7 +188,7 @@ setValue< std::string >( const Token& t, std::string const& value )
 {
   // If it is a StringDatum, it can be casted to a string:
   std::string* s = dynamic_cast< std::string* >( t.datum() );
-  if ( s != NULL )
+  if ( s )
   {
     *s = value;
   }
@@ -213,9 +197,9 @@ setValue< std::string >( const Token& t, std::string const& value )
     // If it is a BoolDatum, it -could- be set from a string, but
     // this operation shall not be allowed!
     BoolDatum* b = dynamic_cast< BoolDatum* >( t.datum() );
-    if ( b != NULL )
+    if ( b )
     {
-      // we have to create Datum objects to get the expected names...
+      // We have to create Datum objects to get the expected names...
       StringDatum const d1;
       NameDatum const d2( "dummy" );
       LiteralDatum const d3( "dummy" );
@@ -229,14 +213,14 @@ setValue< std::string >( const Token& t, std::string const& value )
       // If it is a NameDatum, LiteralDatum or SymbolDatum,
       // it can be casted to a Name:
       Name* n = dynamic_cast< Name* >( t.datum() );
-      if ( n != NULL )
+      if ( n )
       {
         *n = Name( value );
       }
       else
       {
         // The given token can never hold a string!
-        // we have to create Datum objects to get the expected names...
+        // We have to create Datum objects to get the expected names...
         StringDatum const d1;
         NameDatum const d2( "dummy" );
         LiteralDatum const d3( "dummy" );
@@ -265,14 +249,14 @@ template <>
 std::vector< double >
 getValue< std::vector< double > >( const Token& t )
 {
-  // try DoubleVectorDatum first
+  // Try DoubleVectorDatum first
   DoubleVectorDatum* dvd = dynamic_cast< DoubleVectorDatum* >( t.datum() );
   if ( dvd )
   {
     return **dvd;
   }
 
-  // ok, try ArrayDatum
+  // Ok, try ArrayDatum
   ArrayDatum* ad = dynamic_cast< ArrayDatum* >( t.datum() );
   if ( ad )
   {
@@ -281,7 +265,7 @@ getValue< std::vector< double > >( const Token& t )
     return data;
   }
 
-  // out of options
+  // Out of options
   throw TypeMismatch( DoubleVectorDatum().gettypename().toString() + " or " + ArrayDatum().gettypename().toString(),
     t.datum()->gettypename().toString() );
 }
@@ -291,15 +275,15 @@ void
 setValue< std::vector< double > >( const Token& t, std::vector< double > const& value )
 {
   ArrayDatum* ad = dynamic_cast< ArrayDatum* >( t.datum() );
-  if ( ad == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not ad )
+  { // We have to create a Datum object to get the name...
     ArrayDatum const d;
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
   // ArrayDatum is an AggregateDatum, which means, it is derived from
   // TokenArray. Hence, we can use ad just like a TokenArray:
   if ( ad->size() != value.size() )
-  { // arrays have incompatible size
+  { // Arrays have incompatible size
     throw RangeCheck( value.size() );
   }
   for ( size_t i = 0; i < ad->size(); ++i )
@@ -322,14 +306,14 @@ template <>
 std::vector< long >
 getValue< std::vector< long > >( const Token& t )
 {
-  // try IntVectorDatum first
+  // Try IntVectorDatum first
   IntVectorDatum* ivd = dynamic_cast< IntVectorDatum* >( t.datum() );
   if ( ivd )
   {
     return **ivd;
   }
 
-  // ok, try ArrayDatum
+  // Ok, try ArrayDatum
   ArrayDatum* ad = dynamic_cast< ArrayDatum* >( t.datum() );
   if ( ad )
   {
@@ -338,7 +322,7 @@ getValue< std::vector< long > >( const Token& t )
     return data;
   }
 
-  // out of options
+  // Out of options
   throw TypeMismatch( IntVectorDatum().gettypename().toString() + " or " + ArrayDatum().gettypename().toString(),
     t.datum()->gettypename().toString() );
 }
@@ -348,15 +332,15 @@ void
 setValue< std::vector< long > >( const Token& t, std::vector< long > const& value )
 {
   ArrayDatum* ad = dynamic_cast< ArrayDatum* >( t.datum() );
-  if ( ad == NULL )
-  { // we have to create a Datum object to get the name...
+  if ( not ad )
+  { // We have to create a Datum object to get the name...
     ArrayDatum const d;
     throw TypeMismatch( d.gettypename().toString(), t.datum()->gettypename().toString() );
   }
   // ArrayDatum is an AggregateDatum, which means, it is derived from
   // TokenArray. Hence, we can use ad just like a TokenArray:
   if ( ad->size() != value.size() )
-  { // arrays have incompatible size
+  { // Arrays have incompatible size
     throw RangeCheck( value.size() );
   }
   for ( size_t i = 0; i < ad->size(); ++i )

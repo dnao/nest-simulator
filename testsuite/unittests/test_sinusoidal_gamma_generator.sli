@@ -46,7 +46,7 @@ SeeAlso: testsuite::test_sinusoidal_gamma_generator_1, testsuite::test_sinusoida
 */
 
 % return success if generator not known due to missing GSL
-modeldict /sinusoidal_gamma_generator known not
+GetKernelStatus /node_models get /sinusoidal_gamma_generator MemberQ not
 {
   (Skipping test: generator missing) ==
   quit  
@@ -115,20 +115,20 @@ M_ERROR setverbosity
   
 (passed 3) ==
 
-% function building n neuron network with spike detectors
-% num_nrns build_simple_net -> [ spike_detectors ]
+% function building n neuron network with spike recorders
+% num_nrns build_simple_net -> [ spike_recorders ]
 /build_simple_net
 {
   /n Set
   /parrots /parrot_neuron n Create def
   
-  /sdets /spike_detector n Create def
+  /srs /spike_recorder n Create def
 
   /gen /sinusoidal_gamma_generator Create def
   
   gen parrots Connect
-  parrots sdets /one_to_one Connect
-  sdets
+  parrots srs /one_to_one Connect
+  srs
 } def
  
 % return true if all arrays inside an array are identical
@@ -179,11 +179,11 @@ M_ERROR setverbosity
      /individual_spike_trains individual
   >> SetDefaults
 
-  /sdets num_threads nrns_per_thread mul build_simple_net def
+  /srs num_threads nrns_per_thread mul build_simple_net def
 
   1000. Simulate
 
-  sdets { [/events /times] get cva } Map
+  srs { [/events /times] get cva } Map
   individual
   {
     all_different 
@@ -205,6 +205,8 @@ M_ERROR setverbosity
   true 1 4 test4_function
 } assert_or_die
 (passed 4b) ==
+
+skip_if_not_threaded
 
 % test 4c: two threads, one spike train for all targets
 {

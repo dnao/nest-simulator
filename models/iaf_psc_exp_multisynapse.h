@@ -38,34 +38,56 @@
 namespace nest
 {
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingreoup psc
+/* BeginUserDocs: neuron, integrate-and-fire
 
-Name: iaf_psc_exp_multisynapse - Leaky integrate-and-fire neuron model with
-                                 multiple ports.
+Short description
++++++++++++++++++
 
-Description:
+Leaky integrate-and-fire neuron model with multiple ports
 
-iaf_psc_exp_multisynapse is a direct extension of iaf_psc_exp.
-On the postsynapic side, there can be arbitrarily many synaptic
-time constants (iaf_psc_exp has exactly two: tau_syn_ex and tau_syn_in).
+Description
++++++++++++
+
+``iaf_psc_exp_multisynapse`` is a direct extension of iaf_psc_exp.
+On the postsynaptic side, there can be arbitrarily many synaptic
+time constants (``iaf_psc_exp`` has exactly two: ``tau_syn_ex`` and ``tau_syn_in``).
 
 This can be reached by specifying separate receptor ports, each for
 a different time constant. The port number has to match the respective
-"receptor_type" in the connectors.
+``receptor_type`` in the connectors.
 
-Sends: SpikeEvent
+.. note::
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
 
-Author:  Plesser, adapted from iaf_psc_alpha_multisynapse
+   If ``tau_m`` is very close to ``tau_syn_ex`` or ``tau_syn_in``, the model
+   will numerically behave as if ``tau_m`` is equal to ``tau_syn_ex`` or
+   ``tau_syn_in``, respectively, to avoid numerical instabilities.
 
-SeeAlso: iaf_psc_alpha, iaf_psc_delta, iaf_psc_exp, iaf_cond_exp,
-iaf_psc_alpha_multisynapse
-*/
-class iaf_psc_exp_multisynapse : public Archiving_Node
+   For implementation details see the
+   `IAF_neurons_singularity <../model_details/IAF_neurons_singularity.ipynb>`_ notebook.
+
+For conversion between postsynaptic potentials (PSPs) and PSCs,
+please refer to the ``postsynaptic_potential_to_current`` function in
+:doc:`PyNEST Microcircuit: Helper Functions <../auto_examples/Potjans_2014/helpers>`.
+
+Sends
++++++
+
+SpikeEvent
+
+Receives
+++++++++
+
+SpikeEvent, CurrentEvent, DataLoggingRequest
+
+See also
+++++++++
+
+iaf_psc_alpha, iaf_psc_delta, iaf_psc_exp, iaf_cond_exp, iaf_psc_alpha_multisynapse
+
+EndUserDocs */
+
+class iaf_psc_exp_multisynapse : public ArchivingNode
 {
 
 public:
@@ -80,25 +102,24 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node&, rport, synindex, bool );
+  port send_test_event( Node&, rport, synindex, bool ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
-  void calibrate();
+  void init_buffers_() override;
+  void pre_run_hook() override;
 
-  void update( Time const&, const long, const long );
+  void update( Time const&, const long, const long ) override;
 
   // The next two classes need to be friends to access the State_ class/member
   friend class DynamicRecordablesMap< iaf_psc_exp_multisynapse >;
@@ -228,7 +249,7 @@ private:
   struct Variables_
   {
     /** Amplitude of the synaptic current.
-        This value is chosen such that a post-synaptic potential with
+        This value is chosen such that a postsynaptic potential with
         weight one has an amplitude of 1 mV.
         @note mog - I assume this, not checked.
     */
@@ -328,7 +349,7 @@ iaf_psc_exp_multisynapse::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d, P_ );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }

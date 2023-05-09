@@ -46,6 +46,7 @@ ConnectionID::ConnectionID( long source_node_id,
 
 ConnectionID::ConnectionID( long source_node_id, long target_thread, long synapse_modelid, long port )
   : source_node_id_( source_node_id )
+  , target_node_id_( -1 )
   , target_thread_( target_thread )
   , synapse_modelid_( synapse_modelid )
   , port_( port )
@@ -83,10 +84,11 @@ ConnectionID::to_ArrayDatum() const
   return ad;
 }
 
-bool ConnectionID::operator==( const ConnectionID& c ) const
+bool
+ConnectionID::operator==( const ConnectionID& c ) const
 {
-  return ( source_node_id_ == c.source_node_id_ ) and ( target_node_id_ == c.target_node_id_ )
-    and ( target_thread_ == c.target_thread_ ) and ( port_ == c.port_ ) and ( synapse_modelid_ == c.synapse_modelid_ );
+  return source_node_id_ == c.source_node_id_ and ( target_node_id_ == c.target_node_id_ )
+    and target_thread_ == c.target_thread_ and port_ == c.port_ and ( synapse_modelid_ == c.synapse_modelid_ );
 }
 
 void

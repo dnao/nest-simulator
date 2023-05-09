@@ -69,7 +69,7 @@ public:
 
   /** Reset dynamic state to that of model. */
   virtual void
-  init_state( const Device& )
+  init_state()
   {
   }
 
@@ -80,7 +80,7 @@ public:
   }
 
   /** Set internal variables before calls to SimulationManager::run() */
-  virtual void calibrate();
+  virtual void pre_run_hook();
 
   virtual void get_status( DictionaryDatum& ) const;
   virtual void set_status( const DictionaryDatum& );
@@ -130,6 +130,8 @@ private:
 
     //! Copy and recalibrate parameter set
     Parameters_( const Parameters_& );
+
+    Parameters_& operator=( const Parameters_& );
 
     void get( DictionaryDatum& ) const; //!< Store current values in dictionary
     void set( const DictionaryDatum& ); //!< Set values from dictionary

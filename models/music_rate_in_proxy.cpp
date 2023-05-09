@@ -36,8 +36,8 @@
 #include "logging.h"
 
 // Includes from nestkernel:
-#include "kernel_manager.h"
 #include "event_delivery_manager_impl.h"
+#include "kernel_manager.h"
 
 /* ----------------------------------------------------------------
  * Default constructors defining default parameters and state
@@ -46,12 +46,6 @@
 nest::music_rate_in_proxy::Parameters_::Parameters_()
   : port_name_( "rate_in" )
   , channel_( 0 )
-{
-}
-
-nest::music_rate_in_proxy::Parameters_::Parameters_( const Parameters_& op )
-  : port_name_( op.port_name_ )
-  , channel_( op.channel_ )
 {
 }
 
@@ -74,7 +68,7 @@ void
 nest::music_rate_in_proxy::Parameters_::set( const DictionaryDatum& d, State_& s )
 {
   // TODO: This is not possible, as P_ does not know about get_name()
-  //  if(d->known(names::port_name) && s.registered_)
+  //  if(d->known(names::port_name) and s.registered_)
   //    throw MUSICPortAlreadyPublished(get_name(), P_.port_name_);
 
   if ( not s.registered_ )
@@ -121,20 +115,12 @@ nest::music_rate_in_proxy::music_rate_in_proxy( const music_rate_in_proxy& n )
  * ---------------------------------------------------------------- */
 
 void
-nest::music_rate_in_proxy::init_state_( const Node& proto )
-{
-  const music_rate_in_proxy& pr = downcast< music_rate_in_proxy >( proto );
-
-  S_ = pr.S_;
-}
-
-void
 nest::music_rate_in_proxy::init_buffers_()
 {
 }
 
 void
-nest::music_rate_in_proxy::calibrate()
+nest::music_rate_in_proxy::pre_run_hook()
 {
   // only publish the port once
   if ( not S_.registered_ )
@@ -170,7 +156,7 @@ nest::music_rate_in_proxy::set_status( const DictionaryDatum& d )
 }
 
 void
-nest::music_rate_in_proxy::update( Time const& origin, const long from, const long to )
+nest::music_rate_in_proxy::update( Time const&, const long, const long )
 {
 }
 

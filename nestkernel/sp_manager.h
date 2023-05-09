@@ -37,10 +37,10 @@
 #include "manager_interface.h"
 
 // Includes from nestkernel:
-#include "node_collection.h"
 #include "growth_curve_factory.h"
 #include "nest_time.h"
 #include "nest_types.h"
+#include "node_collection.h"
 
 // Includes from sli:
 #include "arraydatum.h"
@@ -64,15 +64,13 @@ class SPManager : public ManagerInterface
 
 public:
   SPManager();
-  virtual ~SPManager();
+  ~SPManager() override;
 
-  virtual void initialize();
-  virtual void finalize();
+  void initialize() override;
+  void finalize() override;
 
-  virtual void get_status( DictionaryDatum& );
-  virtual void set_status( const DictionaryDatum& );
-
-  DictionaryDatum& get_growthcurvedict();
+  void get_status( DictionaryDatum& ) override;
+  void set_status( const DictionaryDatum& ) override;
 
   /**
    * Create a new Growth Curve object using the GrowthCurve Factory
@@ -147,7 +145,7 @@ public:
   delay builder_max_delay() const;
 
   // Creation of synapses
-  void create_synapses( std::vector< index >& pre_vacant_id,
+  bool create_synapses( std::vector< index >& pre_vacant_id,
     std::vector< int >& pre_vacant_n,
     std::vector< index >& post_vacant_id,
     std::vector< int >& post_vacant_n,
@@ -158,7 +156,7 @@ public:
     const index synapse_model,
     const std::string& se_pre_name,
     const std::string& se_post_name );
-  // Deletion of synapses on the post synaptic side
+  // Deletion of synapses on the postsynaptic side
   void delete_synapses_from_post( std::vector< index >& post_deleted_id,
     std::vector< int >& post_deleted_n,
     index synapse_model,
@@ -191,26 +189,13 @@ private:
   bool structural_plasticity_enabled_;
   std::vector< SPBuilder* > sp_conn_builders_;
 
-  /** @BeginDocumentation
-
-   Name: growthcurvedict - growth curves for Model of Structural Plasticity
-
-   Description:
-   This dictionary provides indexes for the growth curve factory
-   */
-  DictionaryDatum growthcurvedict_; //!< Dictionary for growth rules.
-
   /**
    * GrowthCurve factories, indexed by growthcurvedict_ elements.
    */
   std::vector< GenericGrowthCurveFactory* > growthcurve_factories_;
-};
 
-inline DictionaryDatum&
-SPManager::get_growthcurvedict()
-{
-  return growthcurvedict_;
-}
+  DictionaryDatum growthcurvedict_; //!< Dictionary for growth rules.
+};
 
 inline GrowthCurve*
 SPManager::new_growth_curve( Name name )
@@ -230,5 +215,7 @@ SPManager::get_structural_plasticity_update_interval() const
 {
   return structural_plasticity_update_interval_;
 }
-}
-#endif /* SP_MANAGER_H */
+
+} // namespace nest
+
+#endif /* #ifndef SP_MANAGER_H */

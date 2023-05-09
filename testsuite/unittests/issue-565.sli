@@ -21,6 +21,13 @@
  */
 
 
+% SLI2PY: Move to regressiontests
+% SLI2PY: Overlap with corresponding conn/disconn tests elsewhere?
+% SLI2PY: We no longer have het/hom connectors
+
+% SLI2PYComplexity: High --- what does this test do?
+
+
  /** @BeginDocumentation
 Name: testsuite::issue-565
 
@@ -45,9 +52,9 @@ SeeAlso:
 
   M_ERROR setverbosity
 
-  % Create neurons and spike detector
+  % Create neurons and spike recorder
   /iaf_psc_alpha 2 << /I_e 400. >> Create /neurons Set
-  /spike_detector Create /sd Set
+  /spike_recorder Create /sr Set
 
   % Create first connection with static_synapse, instantiating a
   % homogeneous connector
@@ -57,7 +64,7 @@ SeeAlso:
   % Create second connection with new synapse type, causing the
   % homogeneous connector to be turned into a heterogeneous connector
   /static_synapse /dev_syn CopyModel
-  neurons [2] Take sd << /rule /all_to_all >> << /synapse_model /dev_syn >> Connect
+  neurons [2] Take sr << /rule /all_to_all >> << /synapse_model /dev_syn >> Connect
 } def
 
 % Measure event count without deleting connection (ground truth)
@@ -65,7 +72,7 @@ BuildNetwork
 
 100 Simulate
 
-sd GetStatus 0 get /n_events get /n_events_target Set
+sr GetStatus 0 get /n_events get /n_events_target Set
 
 % Measure event count with deleting connection
 BuildNetwork
@@ -79,5 +86,5 @@ neurons [2] Take neurons [1] Take << /rule /all_to_all >>
 
 % Compare result to ground truth
 {
-  sd GetStatus 0 get /n_events get n_events_target eq
+  sr GetStatus 0 get /n_events get n_events_target eq
 } assert_or_die

@@ -24,23 +24,22 @@ Functions for simulation control
 """
 
 from contextlib import contextmanager
+import warnings
 
-from ..ll_api import *
-from .hl_api_helper import *
+from ..ll_api import check_stack, sps, sr, spp
+from .hl_api_helper import is_iterable, is_literal
 
 __all__ = [
     'Cleanup',
     'DisableStructuralPlasticity',
     'EnableStructuralPlasticity',
     'GetKernelStatus',
-    'GetStructuralPlasticityStatus',
     'Install',
     'Prepare',
     'ResetKernel',
     'Run',
     'RunManager',
     'SetKernelStatus',
-    'SetStructuralPlasticityStatus',
     'Simulate',
 ]
 
@@ -49,6 +48,8 @@ __all__ = [
 def Simulate(t):
     """Simulate the network for `t` milliseconds.
 
+    `Simulate(t)` runs `Prepare()`, `Run(t)`, and `Cleanup()` in this order.
+
     Parameters
     ----------
     t : float
@@ -56,7 +57,7 @@ def Simulate(t):
 
     See Also
     --------
-    RunManager
+    RunManager, Prepare, Run, Cleanup
 
     """
 
@@ -77,15 +78,21 @@ def Run(t):
     ------
 
     Call between `Prepare` and `Cleanup` calls, or within a
-    ``with RunManager`` clause.
-
-    Simulate(t): t' = t/m; Prepare(); for _ in range(m): Run(t'); Cleanup()
+    ``with RunManager`` clause.  `Run(t)` is called once by each call to `Simulate(t)`.
 
     `Prepare` must be called before `Run` to calibrate the system, and
     `Cleanup` must be called after `Run` to close files, cleanup handles, and
     so on. After `Cleanup`, `Prepare` can and must be called before more `Run`
-    calls. Any calls to `SetStatus` between `Prepare` and `Cleanup` have
-    undefined behaviour.
+    calls.
+
+    Be careful about modifying the network or neurons between `Prepare` and `Cleanup`
+    calls. In particular, do not call `Create`, `Connect`, or `SetKernelStatus`.
+    Calling `SetStatus` to change membrane potential `V_m` of neurons or synaptic
+    weights (but not delays!) will in most cases work as expected, while changing
+    membrane or synaptic times constants will not work correctly. If in doubt, assume
+    that changes may cause undefined behavior and check these thoroughly.
+
+    Also note that `local_spike_counter` is reset each time you call `Run`.
 
     See Also
     --------
@@ -99,14 +106,16 @@ def Run(t):
 
 @check_stack
 def Prepare():
-    """Calibrate the system before a `Run` call. Not needed for `Simulate`.
+    """Calibrate the system before a `Run` call.
+
+    `Prepare` is automatically called by `Simulate` and `RunManager`.
 
     Call before the first `Run` call, or before calling `Run` after changing
     the system, calling `SetStatus` or `Cleanup`.
 
     See Also
     --------
-    Run, Cleanup
+    Run, Cleanup, Simulate, RunManager
 
     """
 
@@ -115,14 +124,16 @@ def Prepare():
 
 @check_stack
 def Cleanup():
-    """Cleans up resources after a `Run` call. Not needed for `Simulate`.
+    """Cleans up resources after a `Run` calls.
+
+    `Cleanup` is automatically called by `Simulate` and `RunManager`.
 
     Closes state for a series of runs, such as flushing and closing files.
     A `Prepare` is needed after a `Cleanup` before any more calls to `Run`.
 
     See Also
     --------
-    Run, Prepare
+    Run, Prepare, Simulate, RunManager
 
     """
     sr('Cleanup')
@@ -134,13 +145,24 @@ def RunManager():
 
     Calls `Prepare` before a series of `Run` calls, and calls `Cleanup` at end.
 
-    E.g.:
+    For example:
 
     ::
 
         with RunManager():
-            for i in range(10):
-                Run()
+            for _ in range(10):
+                Run(100)
+                # extract results
+
+    Notes
+    -----
+
+    Be careful about modifying the network or neurons inside the `RunManager` context.
+    In particular, do not call `Create`, `Connect`, or `SetKernelStatus`. Calling `SetStatus`
+    to change membrane potential `V_m` of neurons or synaptic weights (but not delays!)
+    will in most cases work as expected, while changing membrane or synaptic times
+    constants will not work correctly. If in doubt, assume that changes may cause
+    undefined behavior and check these thoroughly.
 
     See Also
     --------
@@ -183,16 +205,44 @@ def ResetKernel():
 def SetKernelStatus(params):
     """Set parameters for the simulation kernel.
 
+    See the documentation of :ref:`sec:kernel_attributes` for a valid
+    list of params.
+
     Parameters
     ----------
+
     params : dict
         Dictionary of parameters to set.
 
     See Also
     --------
+
     GetKernelStatus
 
     """
+    # We need the nest module to be fully initialized in order to access the
+    # _kernel_attr_names and _readonly_kernel_attrs. As hl_api_simulation is
+    # imported during nest module initialization, we can't put the import on
+    # the module level, but have to have it on the function level.
+    import nest    # noqa
+    raise_errors = params.get('dict_miss_is_error', nest.dict_miss_is_error)
+    valids = nest._kernel_attr_names
+    readonly = nest._readonly_kernel_attrs
+    keys = list(params.keys())
+    for key in keys:
+        msg = None
+        if key not in valids:
+            msg = f'`{key}` is not a valid kernel parameter, ' + \
+                  'valid parameters are: ' + \
+                  ', '.join(f"'{p}'" for p in sorted(valids))
+        elif key in readonly:
+            msg = f'`{key}` is a readonly kernel parameter'
+        if msg is not None:
+            if raise_errors:
+                raise ValueError(msg)
+            else:
+                warnings.warn(msg + f' \n`{key}` has been ignored')
+                del params[key]
 
     sps(params)
     sr('SetKernelStatus')
@@ -204,11 +254,13 @@ def GetKernelStatus(keys=None):
 
     Parameters
     ----------
+
     keys : str or list, optional
         Single parameter name or `list` of parameter names
 
     Returns
     -------
+
     dict:
         Parameter dictionary, if called without argument
     type:
@@ -218,8 +270,13 @@ def GetKernelStatus(keys=None):
 
     Raises
     ------
+
     TypeError
         If `keys` are of the wrong type.
+
+    Notes
+    -----
+    See SetKernelStatus for documentation on each parameter key.
 
     See Also
     --------
@@ -256,8 +313,9 @@ def Install(module_name):
 
     Notes
     -----
-    Dynamically linked modules are searched in the ``LD_LIBRARY_PATH``
-    (``DYLD_LIBRARY_PATH`` under OSX).
+    Dynamically linked modules are searched in the NEST library
+    directory (``<prefix>/lib/nest``) and in ``LD_LIBRARY_PATH`` (on
+    Linux) or ``DYLD_LIBRARY_PATH`` (on OSX).
 
     **Example**
     ::
@@ -267,53 +325,6 @@ def Install(module_name):
     """
 
     return sr("(%s) Install" % module_name)
-
-
-@check_stack
-def SetStructuralPlasticityStatus(params):
-    """Set structural plasticity parameters for the network simulation.
-
-    Parameters
-    ----------
-    params : dict
-        Dictionary of structural plasticity parameters to set
-
-    See Also
-    --------
-    GetStructuralPlasticityStatus
-
-    """
-
-    sps(params)
-    sr('SetStructuralPlasticityStatus')
-
-
-@check_stack
-def GetStructuralPlasticityStatus(keys=None):
-    """Get the current structural plasticity parameters
-
-    Parameters
-    ---------
-    keys : str or list, optional
-        Keys indicating the values of interest to be retrieved by the get call
-
-    See Also
-    --------
-    SetStructuralPlasticityStatus
-
-    """
-
-    sps({})
-    sr('GetStructuralPlasticityStatus')
-    d = spp()
-    if keys is None:
-        return d
-    elif is_literal(keys):
-        return d[keys]
-    elif is_iterable(keys):
-        return tuple(d[k] for k in keys)
-    else:
-        raise TypeError("keys must be either empty, a string or a list")
 
 
 @check_stack

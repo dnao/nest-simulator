@@ -56,27 +56,37 @@ namespace nest
  */
 extern "C" int iaf_cond_beta_dynamics( double, const double*, double*, void* );
 
-/** @BeginDocumentation
-@ingroup Neurons
-@ingroup iaf
-@ingroup cond
+/* BeginUserDocs: neuron, integrate-and-fire, conductance-based
 
-Name: iaf_cond_beta - Simple conductance based leaky integrate-and-fire neuron
-                      model.
+Short description
++++++++++++++++++
 
-Description:
+Simple conductance based leaky integrate-and-fire neuron model
 
-iaf_cond_beta is an implementation of a spiking neuron using IAF dynamics with
-conductance-based synapses. Incoming spike events induce a post-synaptic change
-of conductance modelled by an beta function. The beta function
-is normalised such that an event of weight 1.0 results in a peak current of
-1 nS at t = tau_rise_[ex|in].
+Description
++++++++++++
 
-Parameters:
+``iaf_cond_beta`` is an implementation of a spiking neuron using IAF dynamics with
+conductance-based synapses. Incoming spike events induce a postsynaptic change
+of conductance modelled by a beta function. The beta function
+is normalized such that an event of weight 1.0 results in a peak current of
+1 nS at :math:`t = \tau_{rise\_[ex|in]}`.
+
+.. note::
+   Per 2009-04-17, this class has been revised to our newest
+   insights into class design. Please use THIS CLASS as a reference
+   when designing your own models with nonlinear dynamics.
+   One weakness of this class is that it distinguishes between
+   inputs to the two synapses by the sign of the synaptic weight.
+   It would be better to use ``receptor_types``, cf ``iaf_cond_alpha_mc``.
+
+See also [1]_, [2]_, [3]_, [4]_, [5]_.
+
+Parameters
+++++++++++
 
 The following parameters can be set in the status dictionary.
 
-\verbatim embed:rst
 ============= ====== =========================================================
  V_m          mV      Membrane potential
  E_L          mV      Leak reversal potential
@@ -87,30 +97,27 @@ The following parameters can be set in the status dictionary.
  E_ex         mV      Excitatory reversal potential
  E_in         mV      Inhibitory reversal potential
  g_L          nS      Leak conductance
- tau_syn_ex   ms      Rise time of the excitatory synaptic alpha function
- tau_decay_ex ms      Rise time of the excitatory synaptic beta function
- tau_syn_in   ms      Rise time of the inhibitory synaptic alpha function
- tau_decay_in ms      Rise time of the inhibitory synaptic beta function
+ tau_rise_ex  ms      Rise time of the excitatory synaptic beta function
+ tau_decay_ex ms      Decay time of the excitatory synaptic beta function
+ tau_rise_in  ms      Rise time of the inhibitory synaptic beta function
+ tau_decay_in ms      Decay time of the inhibitory synaptic beta function
  I_e          pA      Constant input current
 ============= ====== =========================================================
-\endverbatim
 
-Sends: SpikeEvent
 
-Receives: SpikeEvent, CurrentEvent, DataLoggingRequest
+Sends
++++++
 
-Remarks:
+SpikeEvent
 
- @note Per 2009-04-17, this class has been revised to our newest
-        insights into class design. Please use THIS CLASS as a reference
-        when designing your own models with nonlinear dynamics.
-        One weakness of this class is that it distinguishes between
-        inputs to the two synapses by the sign of the synaptic weight.
-        It would be better to use receptor_types, cf iaf_cond_alpha_mc.
+Receives
+++++++++
 
-References:
+SpikeEvent, CurrentEvent, DataLoggingRequest
 
-\verbatim embed:rst
+References
+++++++++++
+
 .. [1] Meffin H, Burkitt AN, Grayden DB (2004). An analytical
        model for the large, fluctuating synaptic conductance state typical of
        neocortical neurons in vivo. Journal of Computational Neuroscience,
@@ -132,14 +139,16 @@ References:
 .. [5] Roth A and van Rossum M (2010). Chapter 6: Modeling synapses.
        in De Schutter, Computational Modeling Methods for Neuroscientists,
        MIT Press.
-\endverbatim
 
-Author: Daniel Naoumenko (modified iaf_cond_alpha by Schrader, Plesser)
 
-SeeAlso: iaf_cond_exp, iaf_cond_alpha, iaf_cond_alpha_mc
+See also
+++++++++
 
-*/
-class iaf_cond_beta : public Archiving_Node
+iaf_cond_exp, iaf_cond_alpha, iaf_cond_alpha_mc
+
+EndUserDocs */
+
+class iaf_cond_beta : public ArchivingNode
 {
 
   // Boilerplate function declarations --------------------------------
@@ -147,7 +156,7 @@ class iaf_cond_beta : public Archiving_Node
 public:
   iaf_cond_beta();
   iaf_cond_beta( const iaf_cond_beta& );
-  ~iaf_cond_beta();
+  ~iaf_cond_beta() override;
 
   /*
    * Import all overloaded virtual functions that we
@@ -158,25 +167,24 @@ public:
   using Node::handle;
   using Node::handles_test_event;
 
-  port send_test_event( Node& tagret, rport receptor_type, synindex, bool );
+  port send_test_event( Node& tagret, rport receptor_type, synindex, bool ) override;
 
-  port handles_test_event( SpikeEvent&, rport );
-  port handles_test_event( CurrentEvent&, rport );
-  port handles_test_event( DataLoggingRequest&, rport );
+  port handles_test_event( SpikeEvent&, rport ) override;
+  port handles_test_event( CurrentEvent&, rport ) override;
+  port handles_test_event( DataLoggingRequest&, rport ) override;
 
-  void handle( SpikeEvent& );
-  void handle( CurrentEvent& );
-  void handle( DataLoggingRequest& );
+  void handle( SpikeEvent& ) override;
+  void handle( CurrentEvent& ) override;
+  void handle( DataLoggingRequest& ) override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void init_state_( const Node& proto );
-  void init_buffers_();
+  void init_buffers_() override;
   double get_normalisation_factor( double, double );
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   // END Boilerplate function declarations ----------------------------
 
@@ -212,7 +220,7 @@ private:
     Parameters_(); //!< Set default parameter values
 
     void get( DictionaryDatum& ) const;             //!< Store current values in dictionary
-    void set( const DictionaryDatum&, Node* node ); //!< Set values from dicitonary
+    void set( const DictionaryDatum&, Node* node ); //!< Set values from dictionary
   };
 
   // State variables class --------------------------------------------
@@ -224,8 +232,7 @@ private:
    * dynamics and the refractory count. The state vector must be a
    * C-style array to be compatible with GSL ODE solvers.
    *
-   * @note Copy constructor and assignment operator are required because
-   *       of the C-style array.
+   * @note Copy constructor required because of the C-style array.
    */
 public:
   struct State_
@@ -249,6 +256,7 @@ public:
 
     State_( const Parameters_& ); //!< Default initialization
     State_( const State_& );
+
     State_& operator=( const State_& );
 
     void get( DictionaryDatum& ) const; //!< Store current values in dictionary
@@ -288,7 +296,7 @@ private:
     gsl_odeiv_evolve* e_;  //!< evolution function
     gsl_odeiv_system sys_; //!< struct describing system
 
-    // Since IntergrationStep_ is initialized with step_, and the resolution
+    // Since IntegrationStep_ is initialized with step_, and the resolution
     // cannot change after nodes have been created, it is safe to place both
     // here.
     double step_;            //!< step size in ms
@@ -403,7 +411,7 @@ iaf_cond_beta::get_status( DictionaryDatum& d ) const
 {
   P_.get( d );
   S_.get( d );
-  Archiving_Node::get_status( d );
+  ArchivingNode::get_status( d );
 
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
@@ -420,7 +428,7 @@ iaf_cond_beta::set_status( const DictionaryDatum& d )
   // write them back to (P_, S_) before we are also sure that
   // the properties to be set in the parent class are internally
   // consistent.
-  Archiving_Node::set_status( d );
+  ArchivingNode::set_status( d );
 
   // if we get here, temporaries contain consistent set of properties
   P_ = ptmp;
@@ -429,6 +437,6 @@ iaf_cond_beta::set_status( const DictionaryDatum& d )
 
 } // namespace
 
-#endif // IAF_COND_BETA_H
-
 #endif // HAVE_GSL
+
+#endif // IAF_COND_BETA_H

@@ -34,10 +34,15 @@
 #include "nest_types.h"
 #include "recording_device.h"
 
-/* BeginDocumentation
+/* BeginUserDocs: device, recorder
+
+Short description
++++++++++++++++++
 
 Recording weights from synapses
-###############################
+
+Description
++++++++++++
 
 The change in synaptic weights over time is a key observable property in
 studies of plasticity in neuronal network models. To access this information, the
@@ -66,8 +71,12 @@ synapses that fulfill the given criteria.
 
    >>> nest.Connect(pre, post, syn_spec="stdp_synapse_rec")
 
+.. include:: ../models/recording_device.rst
 
-EndDocumentation */
+See also
+++++++++
+
+EndUserDocs */
 
 namespace nest
 {
@@ -80,19 +89,19 @@ public:
   weight_recorder( const weight_recorder& );
 
   bool
-  has_proxies() const
+  has_proxies() const override
   {
     return false;
   }
 
   bool
-  local_receiver() const
+  local_receiver() const override
   {
     return true;
   }
 
   Name
-  get_element_type() const
+  get_element_type() const override
   {
     return names::recorder;
   }
@@ -106,19 +115,19 @@ public:
   using Node::handles_test_event;
   using Node::receives_signal;
 
-  void handle( WeightRecorderEvent& );
+  void handle( WeightRecorderEvent& ) override;
 
-  port handles_test_event( WeightRecorderEvent&, rport );
+  port handles_test_event( WeightRecorderEvent&, rport ) override;
 
-  Type get_type() const;
-  SignalType receives_signal() const;
+  Type get_type() const override;
+  SignalType receives_signal() const override;
 
-  void get_status( DictionaryDatum& ) const;
-  void set_status( const DictionaryDatum& );
+  void get_status( DictionaryDatum& ) const override;
+  void set_status( const DictionaryDatum& ) override;
 
 private:
-  void calibrate();
-  void update( Time const&, const long, const long );
+  void pre_run_hook() override;
+  void update( Time const&, const long, const long ) override;
 
   struct Parameters_
   {
@@ -126,7 +135,8 @@ private:
     NodeCollectionDatum targets_;
 
     Parameters_();
-    Parameters_( const Parameters_& );
+    Parameters_( const Parameters_& ) = default;
+    Parameters_& operator=( const Parameters_& ) = default;
     void get( DictionaryDatum& ) const;
     void set( const DictionaryDatum& );
   };

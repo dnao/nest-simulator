@@ -35,10 +35,10 @@ https://www.nest-simulator.org/simulations-with-precise-spike-times/
 
 This example compares the conventional grid-constrained model and the
 precise version for an integrate-and-fire neuron model with exponential
-post-synaptic currents [2]_.
+postsynaptic currents [2]_.
 
 References
-~~~~~~~~~~~
+~~~~~~~~~~
 
 .. [1] Morrison A, Straube S, Plesser HE, Diesmann M. 2007. Exact subthreshold
        integration with continuous spike times in discrete-time neural network
@@ -66,7 +66,7 @@ import matplotlib.pyplot as plt
 # Second, we assign the simulation parameters to variables.
 
 
-simtime = 100.0           # ms
+simtime = 100.0                # ms
 stim_current = 700.0           # pA
 resolutions = [0.1, 0.5, 1.0]  # ms
 
@@ -77,35 +77,37 @@ resolutions = [0.1, 0.5, 1.0]  # ms
 # resolutions. The neurons use their default parameters and we stimulate them
 # by injecting a current using a ``dc_generator`` device. The membrane
 # potential is recorded by a ``voltmeter``, the spikes are recorded by
-# a ``spike_detector``.  The data is stored in a dictionary for later
+# a ``spike_recorder``.  The data is stored in a dictionary for later
 # use.
 
 
 data = {}
 
-for h in resolutions:
-    data[h] = {}
+for resolution in resolutions:
+    data[resolution] = {}
     for model in ["iaf_psc_exp", "iaf_psc_exp_ps"]:
         nest.ResetKernel()
-        nest.SetKernelStatus({'resolution': h})
+        nest.resolution = resolution
 
         neuron = nest.Create(model)
-        voltmeter = nest.Create("voltmeter", params={"interval": h})
+        voltmeter = nest.Create("voltmeter", params={"interval": resolution})
         dc = nest.Create("dc_generator", params={"amplitude": stim_current})
-        sd = nest.Create("spike_detector")
+        sr = nest.Create("spike_recorder")
 
         nest.Connect(voltmeter, neuron)
         nest.Connect(dc, neuron)
-        nest.Connect(neuron, sd)
+        nest.Connect(neuron, sr)
 
         nest.Simulate(simtime)
 
         vm_status = voltmeter.events
-        sd_status = sd.events
-        data[h][model] = {"vm_times": vm_status['times'],
-                          "vm_values": vm_status['V_m'],
-                          "spikes": sd_status['times'],
-                          "V_th": neuron.V_th}
+        sr_status = sr.events
+        data[resolution][model] = {
+            "vm_times": vm_status['times'],
+            "vm_values": vm_status['V_m'],
+            "spikes": sr_status['times'],
+            "V_th": neuron.V_th
+        }
 
 
 ###############################################################################
@@ -121,15 +123,15 @@ for h in resolutions:
 
 colors = ["#3465a4", "#cc0000"]
 
-for v, h in enumerate(sorted(data)):
+for v, resolution in enumerate(sorted(data)):
     plot = plt.subplot(len(data), 1, v + 1)
-    plot.set_title("Resolution: {0} ms".format(h))
+    plot.set_title("Resolution: {0} ms".format(resolution))
 
-    for i, model in enumerate(data[h]):
-        times = data[h][model]["vm_times"]
-        potentials = data[h][model]["vm_values"]
-        spikes = data[h][model]["spikes"]
-        spikes_y = [data[h][model]["V_th"]] * len(spikes)
+    for i, model in enumerate(data[resolution]):
+        times = data[resolution][model]["vm_times"]
+        potentials = data[resolution][model]["vm_values"]
+        spikes = data[resolution][model]["spikes"]
+        spikes_y = [data[resolution][model]["V_th"]] * len(spikes)
 
         plot.plot(times, potentials, "-", c=colors[i], ms=5, lw=2, label=model)
         plot.plot(spikes, spikes_y, ".", c=colors[i], ms=5, lw=2)

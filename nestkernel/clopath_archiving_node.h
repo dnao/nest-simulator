@@ -27,10 +27,10 @@
 #include <deque>
 
 // Includes from nestkernel:
+#include "archiving_node.h"
 #include "histentry.h"
 #include "nest_time.h"
 #include "nest_types.h"
-#include "archiving_node.h"
 #include "synaptic_element.h"
 
 // Includes from sli:
@@ -40,31 +40,31 @@ namespace nest
 {
 
 /**
- * \class Clopath_Archiving_Node
+ * \class ClopathArchivingNode
  * a archiving node which additionally archives parameters
- * needed for the Clopath plasticity rule
+ * and buffers needed for the Clopath plasticity rule
  */
-class Clopath_Archiving_Node : public Archiving_Node
+class ClopathArchivingNode : public ArchivingNode
 {
 
 public:
   /**
-   * \fn Clopath_Archiving_Node()
+   * \fn ClopathArchivingNode()
    * Constructor.
    */
-  Clopath_Archiving_Node();
+  ClopathArchivingNode();
 
   /**
-   * \fn Clopath_Archiving_Node()
+   * \fn ClopathArchivingNode()
    * Copy Constructor.
    */
-  Clopath_Archiving_Node( const Clopath_Archiving_Node& );
+  ClopathArchivingNode( const ClopathArchivingNode& );
 
   /**
    * \fn double get_LTD_value(long t)
    * Returns value in LTD history at time t
    */
-  double get_LTD_value( double t );
+  double get_LTD_value( double t ) override;
 
   /**
    * \fn void get_LTP_history(long t1, long t2,
@@ -75,8 +75,8 @@ public:
    */
   void get_LTP_history( double t1,
     double t2,
-    std::deque< histentry_cl >::iterator* start,
-    std::deque< histentry_cl >::iterator* finish );
+    std::deque< histentry_extended >::iterator* start,
+    std::deque< histentry_extended >::iterator* finish ) override;
 
   /**
    * \fn double get_theta_plus()
@@ -117,12 +117,12 @@ protected:
   void write_clopath_history( Time const& t_sp, double u, double u_bar_plus, double u_bar_minus, double u_bar_bar );
 
   void init_clopath_buffers();
-  void get_status( DictionaryDatum& d ) const;
-  void set_status( const DictionaryDatum& d );
+  void get_status( DictionaryDatum& d ) const override;
+  void set_status( const DictionaryDatum& d ) override;
 
 private:
-  std::vector< histentry_cl > ltd_history_;
-  std::deque< histentry_cl > ltp_history_;
+  std::vector< histentry_extended > ltd_history_;
+  std::deque< histentry_extended > ltp_history_;
 
   double A_LTD_;
 
@@ -148,13 +148,13 @@ private:
 };
 
 inline double
-Clopath_Archiving_Node::get_theta_plus() const
+ClopathArchivingNode::get_theta_plus() const
 {
   return theta_plus_;
 }
 
 inline double
-Clopath_Archiving_Node::get_theta_minus() const
+ClopathArchivingNode::get_theta_minus() const
 {
   return theta_minus_;
 }

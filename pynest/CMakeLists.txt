@@ -49,12 +49,12 @@ if ( HAVE_PYTHON )
       set_target_properties( pynestkernel PROPERTIES LINK_FLAGS "-undefined dynamic_lookup" )
     else ()
       set_target_properties( pynestkernel PROPERTIES LINK_FLAGS "-Wl,--no-as-needed")
-      target_link_libraries( pynestkernel ${PYTHON_LIBRARIES} )
+      target_link_libraries( pynestkernel ${Python_LIBRARIES} )
     endif ()
   endif ()
 
   target_link_libraries( pynestkernel
-      nest_lib nestutil nestkernel random sli_lib
+      nest_lib nestutil nestkernel sli_lib
       ${SLI_MODULES} ${EXTERNAL_MODULE_LIBRARIES}
       )
 
@@ -63,59 +63,25 @@ if ( HAVE_PYTHON )
       ${PROJECT_SOURCE_DIR}/libnestutil
       ${PROJECT_SOURCE_DIR}/nest
       ${PROJECT_SOURCE_DIR}/nestkernel
-      ${PROJECT_SOURCE_DIR}/librandom
+      ${PROJECT_SOURCE_DIR}/nestkernel/spatial
       ${PROJECT_SOURCE_DIR}/sli
+      ${PROJECT_SOURCE_DIR}/thirdparty
       ${SLI_MODULE_INCLUDE_DIRS}
-      ${PYTHON_INCLUDE_DIRS}
+      ${Python_INCLUDE_DIRS}
       )
 
   target_compile_definitions( pynestkernel PRIVATE
       -D_IS_PYNEST
       )
 
-  install( CODE "execute_process(
-    COMMAND ${PYTHON} setup.py build --build-base=${CMAKE_CURRENT_BINARY_DIR}/build
-                               install --prefix=${CMAKE_INSTALL_PREFIX}
-                                       --install-lib=${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}
-                                       --install-scripts=${CMAKE_INSTALL_FULL_BINDIR}
-                                       --install-data=${CMAKE_INSTALL_FULL_DATADIR}
-    WORKING_DIRECTORY \"${CMAKE_CURRENT_BINARY_DIR}\")"
-      )
+  install(DIRECTORY  nest/ ${PROJECT_BINARY_DIR}/pynest/nest/
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest
+      PATTERN "versionchecker.py.in" EXCLUDE
+  )
   install( TARGETS pynestkernel DESTINATION ${PYEXECDIR}/nest/ )
-  install( FILES ${PROJECT_BINARY_DIR}/pynest/do_tests.py
-      DESTINATION ${CMAKE_INSTALL_DATADIR}/extras
-      )
 
   install( DIRECTORY examples/
       DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples/pynest
-      )
+  )
 
-  install( DIRECTORY nest/random/
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest/random
-      )
-
-  install( DIRECTORY nest/spatial/
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest/spatial
-      )
-
-  install( DIRECTORY nest/math/
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest/math
-      )
-
-  install( DIRECTORY nest/logic/
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest/logic
-      )
-
-  install( DIRECTORY nest/spatial_distributions/
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest/spatial_distributions
-      )
-
-  find_program( NOSETESTS nosetests )
-  if ( NOT NOSETESTS STREQUAL "NOSETESTS-NOTFOUND" )
-    add_test( NAME PyNEST
-        COMMAND ${NOSETESTS} -v --with-xunit
-        --xunit-file=${PROJECT_BINARY_DIR}/reports/pynest_tests.xml
-        ${CMAKE_INSTALL_PREFIX}/${PYEXECDIR}/nest/tests
-        )
-  endif ()
 endif ()

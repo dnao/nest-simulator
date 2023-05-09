@@ -72,11 +72,11 @@ public:
   enum
   {
     MICROSEC = ( timeunit_t ) 1,
-    MILLISEC = MICROSEC * 1000,
-    SECONDS = MILLISEC * 1000,
-    MINUTES = SECONDS * 60,
-    HOURS = MINUTES * 60,
-    DAYS = HOURS * 24
+    MILLISEC = MICROSEC * ( timeunit_t ) 1000,
+    SECONDS = MILLISEC * ( timeunit_t ) 1000,
+    MINUTES = SECONDS * ( timeunit_t ) 60,
+    HOURS = MINUTES * ( timeunit_t ) 60,
+    DAYS = HOURS * ( timeunit_t ) 24
   };
 
   static bool correct_timeunit( timeunit_t t );
@@ -108,8 +108,8 @@ public:
    * Returns the time elapsed between the start and stop of the
    * stopwatch. If it is running, it returns the time from start
    * until now. If the stopwatch is run previously, the previous
-   * runtime is added. If you want only the last measurment, you
-   * have to reset the timer, before stating the measurment.
+   * runtime is added. If you want only the last measurement, you
+   * have to reset the timer, before stating the measurement.
    * Does not change the running state.
    */
   double elapsed( timeunit_t timeunit = SECONDS ) const;
@@ -118,8 +118,8 @@ public:
    * Returns the time elapsed between the start and stop of the
    * stopwatch. If it is running, it returns the time from start
    * until now. If the stopwatch is run previously, the previous
-   * runtime is added. If you want only the last measurment, you
-   * have to reset the timer, before stating the measurment.
+   * runtime is added. If you want only the last measurement, you
+   * have to reset the timer, before stating the measurement.
    * Does not change the running state.
    * In contrast to Stopwatch::elapsed(), only the timestamp is returned,
    * that is the number if microseconds as an integer.
@@ -158,7 +158,7 @@ private:
 inline bool
 Stopwatch::correct_timeunit( timeunit_t t )
 {
-  return t == MICROSEC || t == MILLISEC || t == SECONDS || t == MINUTES || t == HOURS || t == DAYS;
+  return t == MICROSEC or t == MILLISEC or t == SECONDS or t == MINUTES or t == HOURS or t == DAYS;
 }
 
 inline void
@@ -218,7 +218,7 @@ nest::Stopwatch::elapsed_timestamp() const
   }
   else
   {
-    // stopped before, get time of current measurment + last measurments
+    // stopped before, get time of current measurement + last measurements
     return _end - _beg + _prev_elapsed;
   }
 #else
@@ -232,7 +232,7 @@ nest::Stopwatch::reset()
 #ifndef DISABLE_TIMING
   _beg = 0; // invariant: _end >= _beg
   _end = 0;
-  _prev_elapsed = 0; // erase all prev. measurments
+  _prev_elapsed = 0; // erase all prev. measurements
   _running = false;  // of course not running.
 #endif
 }
@@ -281,7 +281,7 @@ nest::Stopwatch::get_timestamp()
   // * JuQueen (BG/Q)
   // * MacOS 10.9
   struct timeval now;
-  gettimeofday( &now, ( struct timezone* ) 0 );
+  gettimeofday( &now, static_cast< struct timezone* >( nullptr ) );
   return ( nest::Stopwatch::timestamp_t ) now.tv_usec
     + ( nest::Stopwatch::timestamp_t ) now.tv_sec * nest::Stopwatch::SECONDS;
 }

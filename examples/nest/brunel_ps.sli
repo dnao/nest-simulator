@@ -47,7 +47,7 @@
 
    This example shows how to
 
-      - organize subpopulations in subnets
+      - create populations
       - instrument a network with injection and recording devices
       - record data to files
       - define own functions
@@ -87,7 +87,7 @@
 
 %%% FUNCTION SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Take spike detector, find total number of spikes registered,
+% Take spike recorder, find total number of spikes registered,
 % return average rate per neuron in Hz.
 % NOTE: If you are running with several MPI processes, this
 %       function only gives an approximation to the true rate.
@@ -97,17 +97,17 @@
 {
   << >> begin  % anonymous dictionary for local variables
 
-    /sdet Set
+    /sr Set
 
     % We need to guess how many neurons we record from.
     % This assumes an even distribution of nodes across
     % processes, as well as homogeneous activity in the
     % network. So this is really a hack. NEST needs better
     % support for rate calculations, such as giving the
-    % number of neurons recorded from by each spike detector.
+    % number of neurons recorded from by each spike recorder.
 
     userdict /Nrec get cvd NumProcesses div /nnrn Set
-    sdet /n_events get nnrn userdict /simtime get mul div
+    sr /n_events get nnrn userdict /simtime get mul div
     1000 mul         % convert from mHz to Hz, leave on stack
 
   end
@@ -178,7 +178,7 @@ ComputePSPnorm /J_max_unit Set
   C          % internal synapses
   1 add      % synapse from PoissonGenerator
   N mul
-  Nrec 2 mul % "synapses" to spike detectors
+  Nrec 2 mul % "synapses" to spike recorders
   add
 def
 
@@ -196,10 +196,10 @@ ResetKernel      % clear all existing network elements
 tic % start timer on construction
 
   (Creating excitatory population.) =  % show message
-  /E_neurons /iaf_psc_alpha_canon NE Create def  % create exitatory neurons
+  /E_neurons /iaf_psc_alpha_ps NE Create def  % create exitatory neurons
 
   (Creating inhibitory population.) =  % show message
-  /I_neurons /iaf_psc_alpha_canon NI Create def  % create inhibitory neurons
+  /I_neurons /iaf_psc_alpha_ps NI Create def  % create inhibitory neurons
 
   % all neurons
   /allNeurons E_neurons I_neurons join def
@@ -218,14 +218,14 @@ tic % start timer on construction
     /rate  p_rate
   >> SetStatus
 
-  % one detector would in principle be enough,
+  % one recorder would in principle be enough,
   % but by recording the populations separately,
   % we save us a lot of sorting work later
-  (Creating excitatory spike detector.) =
-  /exsd /spike_detector << /record_to /ascii >> Create def
+  (Creating excitatory spike recorder.) =
+  /exsr /spike_recorder << /record_to /ascii >> Create def
 
-  (Creating inhibitory spike detector.) =
-  /insd /spike_detector << /record_to /ascii >> Create def
+  (Creating inhibitory spike recorder.) =
+  /insr /spike_recorder << /record_to /ascii >> Create def
 
   % Setting neuron parameters after creation is deprecated in NEST 2.0.
   % You should set parameters using SetDefaults before creating neurons,
@@ -235,15 +235,16 @@ tic % start timer on construction
   allNeurons
   {
     <<
-      /tau_m   tauMem
-      /C_m     CMem
-      /tau_syn tauSyn
-      /t_ref   tauRef
-      /E_L     E_L
-      /V_th    theta
-      /V_m     E_L
-      /V_reset E_L
-      /C_m     1.0     % capacitance is unity in Brunel model
+      /tau_m      tauMem
+      /C_m        CMem
+      /tau_syn_ex tauSyn
+      /tau_syn_in tauSyn
+      /t_ref      tauRef
+      /E_L        E_L
+      /V_th       theta
+      /V_m        E_L
+      /V_reset    E_L
+      /C_m        1.0     % capacitance is unity in Brunel model
     >> SetStatus
 
   } forall
@@ -278,17 +279,17 @@ tic % start timer on construction
   E_neurons I_neurons << /rule /fixed_indegree /indegree CE >> << /synapse_model /syn_ex >> Connect
   I_neurons I_neurons << /rule /fixed_indegree /indegree CI >> << /synapse_model /syn_in >> Connect
 
-  % Spike detectors are connected to the first Nrec neurons in each
+  % Spike recorders are connected to the first Nrec neurons in each
   % population.  Since neurons are equal and connectivity is homogeneously
   % randomized, this is equivalent to picking Nrec neurons at random
   % from each population
-  (Connecting spike detectors.) =
+  (Connecting spike recorders.) =
 
   E_neurons Nrec Take % pick the first 500 neurons
-    exsd Connect
+    exsr Connect
 
   I_neurons Nrec Take % pick the first 500 neurons
-    insd Connect
+    insr Connect
 
   % read out time used for building
 
@@ -306,7 +307,7 @@ toc /SimCPUTime Set
 (\nBrunel Network Simulation) =
 (Number of Neurons : ) =only N =
 (Number of Synapses: ) =only Nsyn =
-(Excitatory rate   : ) =only exsd ComputeRate =only ( Hz) =
-(Inhibitory rate   : ) =only insd ComputeRate =only ( Hz) =
+(Excitatory rate   : ) =only exsr ComputeRate =only ( Hz) =
+(Inhibitory rate   : ) =only insr ComputeRate =only ( Hz) =
 (Building time     : ) =only BuildCPUTime =only ( s) =
 (Simulation time   : ) =only SimCPUTime   =only ( s\n) =
