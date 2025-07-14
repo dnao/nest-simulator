@@ -277,7 +277,7 @@ private:
     double t_ref;          //!< Refractory period in ms
     double tau_AMPA;       //!< Synaptic Time Constant AMPA Synapse in ms
     double tau_GABA;       //!< Synaptic Time Constant GABA Synapse in ms
-    double tau_K;       //!< Synaptic Time Constant GABA Synapse in ms
+    double tau_K;          //!< Time Constant Potassium in ms
     double tau_decay_NMDA; //!< Synaptic Decay Time Constant NMDA Synapse in ms
     double tau_rise_NMDA;  //!< Synaptic Decay Time Constant NMDA Synapse in ms
     double alpha;          //!< Scaling factor for NMDA synapse in 1/ms
@@ -324,7 +324,7 @@ public:
     double I_NMDA_; // For recording NMDA currents
     double I_AMPA_; // For recording AMPA currents
     double I_GABA_; // For recording GABA currents
-    double I_K_; // For recording GABA currents
+    double I_K_;    // For recording Potassium current
 
     int r_; //!< number of refractory steps remaining
 
@@ -464,7 +464,8 @@ aiaf_bw_2001::handles_test_event( SpikeEvent& e, size_t receptor_type )
   const Node& sender = e.get_sender();
   if ( receptor_type == NMDA and typeid( sender ) != typeid( *this ) )
   {
-    throw IllegalConnection( "For NMDA synapses in aiaf_bw_2001, pre-synaptic neuron must also be of type aiaf_bw_2001" );
+    throw IllegalConnection(
+        "For NMDA synapses in aiaf_bw_2001, pre-synaptic neuron must also be of type aiaf_bw_2001" );
   }
   return receptor_type;
 }

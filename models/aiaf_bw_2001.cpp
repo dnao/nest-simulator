@@ -122,7 +122,7 @@ nest::aiaf_bw_2001::Parameters_::Parameters_()
   : E_L( -70.0 )          // mV
   , E_ex( 0.0 )           // mV
   , E_in( -70.0 )         // mV
-  , E_K( -85.0 )         // mV
+  , E_K( -85.0 )          // mV
   , V_th( -55.0 )         // mV
   , V_reset( -60.0 )      // mV
   , C_m( 500.0 )          // pF
@@ -130,7 +130,7 @@ nest::aiaf_bw_2001::Parameters_::Parameters_()
   , t_ref( 2.0 )          // ms
   , tau_AMPA( 2.0 )       // ms
   , tau_GABA( 5.0 )       // ms
-  , tau_K( 60.0 )       // ms
+  , tau_K( 60.0 )         // ms
   , tau_decay_NMDA( 100 ) // ms
   , tau_rise_NMDA( 2 )    // ms
   , alpha( 0.5 )          // 1 / ms
