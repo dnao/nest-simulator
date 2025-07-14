@@ -14,7 +14,7 @@ Install from source in a mamba environment
 
 .. code-block:: sh
 
-    mamba env create -f nest-simulator/environment.yml --p <path/to/mamba/env>
+    mamba env create -f nest-simulator/environment.yml -p <path/to/mamba/env>
     mamba activate <path/to/mamba/env>
 
 * Create a build directory:
