@@ -351,7 +351,7 @@ nest::aiaf_bw_2001::init_state_()
 void
 nest::aiaf_bw_2001::init_buffers_()
 {
-  B_.spikes_.resize( 3 );
+  B_.spikes_.resize( 4 );
   for ( auto& sb : B_.spikes_ )
   {
     sb.clear(); // includes resize
