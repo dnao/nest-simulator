@@ -103,7 +103,7 @@ nest::aiaf_bw_2001_dynamics( double, const double y[], double f[], void* pnode )
 
   const double I_syn = node.S_.I_AMPA_ + node.S_.I_GABA_ + node.S_.I_NMDA_ + node.S_.I_K_;
 
-  f[ S::V_m ] = ( -node.P_.g_L * ( y[ S::V_m ] - node.P_.E_L ) - I_syn + node.B_.I_stim_ ) / node.P_.C_m;
+  f[ S::V_m ] = ( -node.P_.g_L * ( y[ S::V_m ] - node.P_.E_L ) - I_syn + node.B_.I_stim_ + node.P_.I_e) / node.P_.C_m;
 
   f[ S::s_AMPA ] = -y[ S::s_AMPA ] / node.P_.tau_AMPA;
   f[ S::s_NMDA ] = -y[ S::s_NMDA ] / node.P_.tau_decay_NMDA;
@@ -123,6 +123,7 @@ nest::aiaf_bw_2001::Parameters_::Parameters_()
   , E_ex( 0.0 )           // mV
   , E_in( -70.0 )         // mV
   , E_K( -85.0 )          // mV
+  , I_e( 0.0 )            // mV
   , V_th( -55.0 )         // mV
   , V_reset( -60.0 )      // mV
   , C_m( 500.0 )          // pF
@@ -198,10 +199,12 @@ void
 nest::aiaf_bw_2001::Parameters_::get( DictionaryDatum& d ) const
 {
   def< double >( d, names::E_L, E_L );
+  def< double >( d, names::E_K, E_K );
   def< double >( d, names::E_ex, E_ex );
   def< double >( d, names::E_in, E_in );
   def< double >( d, names::V_th, V_th );
   def< double >( d, names::V_reset, V_reset );
+  def< double >( d, names::I_e, I_e );
   def< double >( d, names::C_m, C_m );
   def< double >( d, names::g_L, g_L );
   def< double >( d, names::t_ref, t_ref );
@@ -221,11 +224,13 @@ nest::aiaf_bw_2001::Parameters_::set( const DictionaryDatum& d, Node* node )
   // allow setting the membrane potential
   updateValueParam< double >( d, names::E_L, E_L, node );
   updateValueParam< double >( d, names::E_ex, E_ex, node );
+  updateValueParam< double >( d, names::E_K, E_K, node );
   updateValueParam< double >( d, names::E_in, E_in, node );
   updateValueParam< double >( d, names::V_th, V_th, node );
   updateValueParam< double >( d, names::V_reset, V_reset, node );
   updateValueParam< double >( d, names::C_m, C_m, node );
   updateValueParam< double >( d, names::g_L, g_L, node );
+  updateValueParam< double >( d, names::I_e, I_e, node );
   updateValueParam< double >( d, names::t_ref, t_ref, node );
   updateValueParam< double >( d, names::tau_AMPA, tau_AMPA, node );
   updateValueParam< double >( d, names::tau_GABA, tau_GABA, node );
@@ -248,7 +253,7 @@ nest::aiaf_bw_2001::Parameters_::set( const DictionaryDatum& d, Node* node )
   {
     throw BadProperty( "Refractory time cannot be negative." );
   }
-  if ( tau_AMPA <= 0 or tau_GABA <= 0 or tau_decay_NMDA <= 0 or tau_rise_NMDA <= 0 or tau_K <= 0)
+  if ( tau_AMPA <= 0 or tau_GABA <= 0 or tau_decay_NMDA <= 0 or tau_rise_NMDA <= 0 or tau_K <= 0 )
   {
     throw BadProperty( "All time constants must be strictly positive." );
   }

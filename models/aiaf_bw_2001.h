@@ -272,6 +272,7 @@ private:
     double E_K;            //!< Potassium reversal Potential in mV
     double V_th;           //!< Threshold Potential in mV
     double V_reset;        //!< Reset Potential in mV
+    double I_e;            //!< Intrinsic current in pA
     double C_m;            //!< Membrane Capacitance in pF
     double g_L;            //!< Leak Conductance in nS
     double t_ref;          //!< Refractory period in ms
@@ -465,7 +466,7 @@ aiaf_bw_2001::handles_test_event( SpikeEvent& e, size_t receptor_type )
   if ( receptor_type == NMDA and typeid( sender ) != typeid( *this ) )
   {
     throw IllegalConnection(
-        "For NMDA synapses in aiaf_bw_2001, pre-synaptic neuron must also be of type aiaf_bw_2001" );
+      "For NMDA synapses in aiaf_bw_2001, pre-synaptic neuron must also be of type aiaf_bw_2001" );
   }
   return receptor_type;
 }
