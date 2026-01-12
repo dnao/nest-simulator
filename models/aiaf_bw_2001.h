@@ -252,8 +252,8 @@ private:
     INF_SPIKE_RECEPTOR = 0,
     AMPA,
     GABA,
-    NMDA,
     K,
+    NMDA,
     SUP_SPIKE_RECEPTOR
   };
 
