@@ -31,7 +31,7 @@ Fixtures available to the entire testsuite directory.
         pass
 """
 
-import dataclasses
+import importlib.util
 import os
 import pathlib
 import subprocess
@@ -45,7 +45,6 @@ sys.path.append(str(pathlib.Path(__file__).parent / "utilities"))
 # Ignore it during test collection
 collect_ignore = ["utilities"]
 
-import testsimulation  # noqa
 import testutil  # noqa
 
 
@@ -58,6 +57,14 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "requires_many_cores: mark tests as needing many cores (deselect with '-m \"not requires_many_cores\"')",
+    )
+    config.addinivalue_line(
+        "markers",
+        "skipif_missing_music: mark tests requiring MUSIC",
+    )
+    config.addinivalue_line(
+        "markers",
+        "skipif_missing_mpi4py: mark tests requiring MPI4Py",
     )
 
 
@@ -112,6 +119,21 @@ def skipif_missing_mpi(request, have_mpi):
 
 
 @pytest.fixture(scope="session")
+def have_mpi4py():
+    return importlib.util.find_spec("mpi4py") is not None and nest.ll_api.sli_func("statusdict/have_mpi ::")
+
+
+@pytest.fixture(autouse=True)
+def skipif_missing_mpi4py(request, have_mpi4py):
+    """
+    Globally applied fixture that skips tests marked to be skipped when MPI
+    support is missing.
+    """
+    if not have_mpi4py and request.node.get_closest_marker("skipif_missing_mpi4py"):
+        pytest.skip("skipped because missing MPI4Py support.")
+
+
+@pytest.fixture(scope="session")
 def have_gsl():
     return nest.ll_api.sli_func("statusdict/have_gsl ::")
 
@@ -131,6 +153,11 @@ def have_hdf5():
     return nest.ll_api.sli_func("statusdict/have_hdf5 ::")
 
 
+@pytest.fixture(scope="session")
+def have_music():
+    return nest.ll_api.sli_func("statusdict/have_music ::")
+
+
 @pytest.fixture(autouse=True)
 def skipif_missing_hdf5(request, have_hdf5):
     """
@@ -139,6 +166,16 @@ def skipif_missing_hdf5(request, have_hdf5):
     """
     if not have_hdf5 and request.node.get_closest_marker("skipif_missing_hdf5"):
         pytest.skip("skipped because missing HDF5 support.")
+
+
+@pytest.fixture(autouse=True)
+def skipif_missing_music(request, have_music):
+    """
+    Globally applied fixture that skips tests marked to be skipped when HDF5 is
+    missing.
+    """
+    if not have_music and request.node.get_closest_marker("skipif_missing_music"):
+        pytest.skip("skipped because missing MUSIC support.")
 
 
 @pytest.fixture(scope="session")
@@ -159,10 +196,15 @@ def have_plotting():
 
 @pytest.fixture(scope="session")
 def subprocess_compatible_mpi():
-    """Until at least OpenMPI 4.1.6, the following fails due to a bug in OpenMPI, from 5.0.7 is definitely safe."""
-
-    res = subprocess.run(["mpirun", "-np", "1", "echo"])
-    return res.returncode == 0
+    """
+    Until at least OpenMPI 4.1.6, the following fails due to a bug in OpenMPI,
+    from 5.0.7 is definitely safe.
+    """
+    try:
+        res = subprocess.run(["mpirun", "-np", "1", "echo"])
+        return 0 == res.returncode
+    except FileNotFoundError:
+        return False
 
 
 @pytest.fixture(autouse=True)
@@ -174,24 +216,3 @@ def skipif_incompatible_mpi(request, subprocess_compatible_mpi):
 
     if not subprocess_compatible_mpi and request.node.get_closest_marker("skipif_incompatible_mpi"):
         pytest.skip("skipped because MPI is incompatible with subprocess")
-
-
-@pytest.fixture(autouse=True)
-def simulation_class(request):
-    return getattr(request, "param", testsimulation.Simulation)
-
-
-@pytest.fixture
-def simulation(request):
-    marker = request.node.get_closest_marker("simulation")
-    sim_cls = marker.args[0] if marker else testsimulation.Simulation
-    sim = sim_cls(*(request.getfixturevalue(field.name) for field in dataclasses.fields(sim_cls)))
-    nest.ResetKernel()
-    if getattr(sim, "set_resolution", True):
-        nest.resolution = sim.resolution
-    nest.local_num_threads = sim.local_num_threads
-    return sim
-
-
-# Inject the root simulation fixtures into this module to be always available.
-testutil.create_dataclass_fixtures(testsimulation.Simulation, __name__)

@@ -55,6 +55,7 @@
 #include "kernel_manager.h"
 #include "mpi_manager_impl.h"
 #include "nest_names.h"
+#include "nest_types.h"
 #include "node.h"
 #include "sonata_connector.h"
 #include "stopwatch_impl.h"
@@ -443,6 +444,8 @@ nest::ConnectionManager::connect( NodeCollectionPTR sources,
   const DictionaryDatum& conn_spec,
   const std::vector< DictionaryDatum >& syn_specs )
 {
+  kernel().node_manager.update_thread_local_node_data();
+
   if ( sources->empty() )
   {
     throw IllegalConnection( "Presynaptic nodes cannot be an empty NodeCollection" );
@@ -483,32 +486,6 @@ nest::ConnectionManager::connect( NodeCollectionPTR sources,
   set_connections_have_changed();
 
   cb.connect();
-}
-
-
-void
-nest::ConnectionManager::connect( TokenArray sources, TokenArray targets, const DictionaryDatum& syn_spec )
-{
-  // Get synapse id
-  size_t syn_id = 0;
-  auto synmodel = syn_spec->lookup( names::model );
-  if ( not synmodel.empty() )
-  {
-    const std::string synmodel_name = getValue< std::string >( synmodel );
-    // The following throws UnknownSynapseType for invalid synmodel_name
-    syn_id = kernel().model_manager.get_synapse_model_id( synmodel_name );
-  }
-  // Connect all sources to all targets
-  for ( auto&& source : sources )
-  {
-    auto source_node = kernel().node_manager.get_node_or_proxy( source );
-    for ( auto&& target : targets )
-    {
-      auto target_node = kernel().node_manager.get_node_or_proxy( target );
-      auto target_thread = target_node->get_thread();
-      connect_( *source_node, *target_node, source, target_thread, syn_id, syn_spec );
-    }
-  }
 }
 
 
@@ -644,6 +621,8 @@ nest::ConnectionManager::connect_arrays( long* sources,
 {
   // only place, where stopwatch sw_construction_connect is needed in addition to nestmodule.cpp
   sw_construction_connect.start();
+
+  kernel().node_manager.update_thread_local_node_data();
 
   // Mapping pointers to the first parameter value of each parameter to their respective names.
   // The bool indicates whether the value is an integer or not, and is determined at a later point.
@@ -811,6 +790,8 @@ void
 nest::ConnectionManager::connect_sonata( const DictionaryDatum& graph_specs, const long hyberslab_size )
 {
 #ifdef HAVE_HDF5
+  kernel().node_manager.update_thread_local_node_data();
+
   SonataConnector sonata_connector( graph_specs, hyberslab_size );
 
   // Set flag before calling sonata_connector.connect() in case exception is thrown after some connections have been
@@ -863,6 +844,8 @@ nest::ConnectionManager::connect_tripartite( NodeCollectionPTR sources,
 
   const std::string primary_rule = static_cast< const std::string >( ( *conn_spec )[ names::rule ] );
   const std::string third_rule = static_cast< const std::string >( ( *third_conn_spec )[ names::rule ] );
+
+  kernel().node_manager.update_thread_local_node_data();
 
   ConnBuilder cb( primary_rule, third_rule, sources, targets, third, conn_spec, third_conn_spec, syn_specs );
 
@@ -994,23 +977,25 @@ nest::ConnectionManager::find_connection( const size_t tid,
   const size_t snode_id,
   const size_t tnode_id )
 {
-  // lcid will hold the position of the /first/ connection from node
-  // snode_id to any local node, or be invalid
-  size_t lcid = source_table_.find_first_source( tid, syn_id, snode_id );
-  if ( lcid == invalid_index )
+  if ( use_compressed_spikes_ )
   {
-    return invalid_index;
-  }
+    const size_t source_index = source_table_.find_first_source( tid, syn_id, snode_id );
+    if ( source_index == invalid_index )
+    {
+      return invalid_index;
+    }
 
-  // lcid will hold the position of the /first/ connection from node
-  // snode_id to node tnode_id, or be invalid
-  lcid = connections_[ tid ][ syn_id ]->find_first_target( tid, lcid, tnode_id );
-  if ( lcid != invalid_index )
-  {
+    // lcid will hold the position of the /first/ enabled connection from node
+    // snode_id to node tnode_id, or be invalid
+    const size_t lcid = connections_[ tid ][ syn_id ]->find_first_target( tid, source_index, tnode_id );
+
     return lcid;
   }
-
-  return lcid;
+  else
+  {
+    return connections_[ tid ][ syn_id ]->find_enabled_connection( tid, syn_id, snode_id, tnode_id, source_table_ );
+  }
+  return invalid_index;
 }
 
 void
@@ -1021,7 +1006,7 @@ nest::ConnectionManager::disconnect( const size_t tid,
 {
   assert( syn_id != invalid_synindex );
 
-  const size_t lcid = find_connection( tid, syn_id, snode_id, tnode_id );
+  const auto lcid = find_connection( tid, syn_id, snode_id, tnode_id );
 
   if ( lcid == invalid_index ) // this function should only be called
                                // with a valid connection
@@ -1468,7 +1453,7 @@ nest::ConnectionManager::sort_connections( const size_t tid )
         connections_[ tid ][ syn_id ]->sort_connections( source_table_.get_thread_local_sources( tid )[ syn_id ] );
       }
     }
-    remove_disabled_connections( tid );
+    remove_disabled_connections_( tid );
   }
 }
 
@@ -1681,19 +1666,20 @@ nest::ConnectionManager::deliver_secondary_events( const size_t tid,
     {
       if ( positions_tid[ syn_id ].size() > 0 )
       {
-        SecondaryEvent& prototype = kernel().model_manager.get_secondary_event_prototype( syn_id, tid );
+        std::unique_ptr< SecondaryEvent > prototype =
+          kernel().model_manager.get_secondary_event_prototype( syn_id, tid );
 
         size_t lcid = 0;
         const size_t lcid_end = positions_tid[ syn_id ].size();
         while ( lcid < lcid_end )
         {
           std::vector< unsigned int >::iterator readpos = recv_buffer.begin() + positions_tid[ syn_id ][ lcid ];
-          prototype << readpos;
-          prototype.set_stamp( stamp );
+          *prototype << readpos;
+          prototype->set_stamp( stamp );
 
           // send delivers event to all targets with the same source
           // and returns how many targets this event was delivered to
-          lcid += connections_[ tid ][ syn_id ]->send( tid, lcid, cm, prototype );
+          lcid += connections_[ tid ][ syn_id ]->send( tid, lcid, cm, *prototype );
         }
       }
     }
@@ -1717,8 +1703,10 @@ nest::ConnectionManager::compress_secondary_send_buffer_pos( const size_t tid )
 }
 
 void
-nest::ConnectionManager::remove_disabled_connections( const size_t tid )
+nest::ConnectionManager::remove_disabled_connections_( const size_t tid )
 {
+  assert( use_compressed_spikes_ );
+
   std::vector< ConnectorBase* >& connectors = connections_[ tid ];
 
   for ( synindex syn_id = 0; syn_id < connectors.size(); ++syn_id )
